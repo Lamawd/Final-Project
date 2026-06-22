@@ -1,0 +1,103 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from pydantic import BaseModel, field_validator
+from typing import Optional
+from urllib.parse import urlparse
+from app.core.database import get_db
+from app.core.security import get_current_user, require_admin
+from app.models.models import Resource, ResourceStatus, Rating, Engagement, User
+
+router = APIRouter(prefix="/resources", tags=["resources"])
+
+
+class ResourceCreate(BaseModel):
+    topic_id: int
+    title: str
+    url: str
+    resource_type: Optional[str] = "article"
+
+    @field_validator("url")
+    @classmethod
+    def safe_url(cls, v: str) -> str:
+        parsed = urlparse(v.strip())
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError("URL must start with http:// or https://")
+        if not parsed.netloc:
+            raise ValueError("Invalid URL")
+        return v.strip()
+
+    @field_validator("title")
+    @classmethod
+    def non_empty_title(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Title cannot be empty")
+        return v[:200]  # cap length
+
+
+class RatingCreate(BaseModel):
+    stars: int  # 1-5
+
+
+class EngagementUpdate(BaseModel):
+    watch_completion: float = 0.0
+    revisit_count: int = 0
+    completed: bool = False
+
+
+@router.get("/topic/{topic_id}")
+def get_by_topic(topic_id: int, db: Session = Depends(get_db)):
+    resources = db.query(Resource).filter_by(topic_id=topic_id, status=ResourceStatus.approved).all()
+    return [{"id": r.id, "title": r.title, "url": r.url, "type": r.resource_type} for r in resources]
+
+
+@router.post("/", status_code=201)
+def upload_resource(data: ResourceCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    resource = Resource(**data.model_dump(), uploader_id=current_user.id)
+    db.add(resource)
+    db.commit()
+    db.refresh(resource)
+    return {"id": resource.id, "status": resource.status}
+
+
+@router.post("/{resource_id}/rate")
+def rate(resource_id: int, data: RatingCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not 1 <= data.stars <= 5:
+        raise HTTPException(status_code=400, detail="Stars must be 1-5")
+    rating = db.query(Rating).filter_by(user_id=current_user.id, resource_id=resource_id).first()
+    if rating:
+        rating.stars = data.stars
+    else:
+        db.add(Rating(user_id=current_user.id, resource_id=resource_id, stars=data.stars))
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/{resource_id}/engage")
+def engage(resource_id: int, data: EngagementUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    eng = db.query(Engagement).filter_by(user_id=current_user.id, resource_id=resource_id).first()
+    if eng:
+        eng.watch_completion = data.watch_completion
+        eng.revisit_count = data.revisit_count
+        eng.completed = data.completed
+    else:
+        db.add(Engagement(user_id=current_user.id, resource_id=resource_id, **data.model_dump()))
+    db.commit()
+    return {"ok": True}
+
+
+# Admin review endpoints
+@router.get("/pending", dependencies=[Depends(require_admin)])
+def pending_resources(db: Session = Depends(get_db)):
+    resources = db.query(Resource).filter_by(status=ResourceStatus.pending).all()
+    return [{"id": r.id, "title": r.title, "url": r.url, "uploader_id": r.uploader_id} for r in resources]
+
+
+@router.post("/{resource_id}/review")
+def review(resource_id: int, approved: bool, _: User = Depends(require_admin), db: Session = Depends(get_db)):
+    resource = db.query(Resource).filter(Resource.id == resource_id).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Not found")
+    resource.status = ResourceStatus.approved if approved else ResourceStatus.rejected
+    db.commit()
+    return {"status": resource.status}
