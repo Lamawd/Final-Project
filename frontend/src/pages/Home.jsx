@@ -5,7 +5,7 @@ import api from "../api/client";
 import { COURSES, courseOf } from "../courses";
 
 const TESTIMONIALS = [
-  { name: "Amir R.", role: "CS Student", text: "The roadmap style makes it so clear what to learn next. I finished DSA in two weeks!", avatar: "A" },
+  { name: "Đỗ Nam Khánh", role: "ICT Student", text: "The roadmap style makes it so clear what to learn next. I finished DSA in two weeks!", avatar: null, photo: "/friendA.jpeg" },
   { name: "Priya S.", role: "Self-taught Dev", text: "Love how every topic links to real videos and articles. No more searching around.", avatar: "P" },
   { name: "Jake T.", role: "Bootcamp Grad", text: "The recommendation engine actually works — it surfaced SQL topics I was missing.", avatar: "J" },
 ];
@@ -169,7 +169,9 @@ export default function Home() {
             <motion.div key={t.name} className="testimonial-card" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 + i * 0.08 }}>
               <p className="testimonial-text">"{t.text}"</p>
               <div className="testimonial-author">
-                <div className="testimonial-avatar">{t.avatar}</div>
+                <div className="testimonial-avatar">
+                  {t.photo ? <img src={t.photo} alt={t.name} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} /> : t.avatar}
+                </div>
                 <div>
                   <strong style={{ fontSize: "0.9rem" }}>{t.name}</strong>
                   <span className="muted" style={{ fontSize: "0.8rem", display: "block" }}>{t.role}</span>
