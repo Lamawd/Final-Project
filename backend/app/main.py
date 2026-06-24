@@ -13,16 +13,6 @@ logger = logging.getLogger("opic")
 
 app = FastAPI(title="Opic API")
 
-origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start = time.time()
@@ -34,6 +24,16 @@ async def log_requests(request: Request, call_next):
     except Exception as exc:
         logger.error(f"Unhandled error on {request.method} {request.url.path}: {exc}", exc_info=True)
         return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(auth.router)
 app.include_router(topics.router)
