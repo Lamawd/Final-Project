@@ -9,8 +9,16 @@ import TopicDetail from "./pages/TopicDetail";
 import AdminReview from "./pages/AdminReview";
 import Onboarding from "./pages/Onboarding";
 import SuggestPage from "./pages/SuggestPage";
+import Progress from "./pages/Progress";
+import UserProfile from "./pages/UserProfile";
+import Courses from "./pages/Courses";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import NotFound from "./pages/NotFound";
 
-const AUTH_ROUTES = ["/login", "/register"];
+import ErrorBoundary from "./components/ErrorBoundary";
+
+const AUTH_ROUTES = ["/login", "/register", "/forgot-password", "/reset-password"];
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -33,12 +41,17 @@ function Layout() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/onboarding" element={<Protected><Onboarding /></Protected>} />
         <Route path="/" element={<Protected><Home /></Protected>} />
+        <Route path="/courses" element={<Protected><Courses /></Protected>} />
         <Route path="/courses/:courseId" element={<Protected><CourseDetail /></Protected>} />
         <Route path="/topics/:id" element={<Protected><TopicDetail /></Protected>} />
-        <Route path="/suggest" element={<Protected><SuggestPage /></Protected>} />
+        <Route path="/progress" element={<Protected><Progress /></Protected>} />
+        <Route path="/profile" element={<Protected><UserProfile /></Protected>} />
         <Route path="/admin" element={<AdminOnly><AdminReview /></AdminOnly>} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </>
   );
@@ -48,7 +61,9 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Layout />
+        <ErrorBoundary>
+          <Layout />
+        </ErrorBoundary>
       </BrowserRouter>
     </AuthProvider>
   );

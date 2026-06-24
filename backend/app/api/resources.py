@@ -37,12 +37,14 @@ class ResourceCreate(BaseModel):
 
 class RatingCreate(BaseModel):
     stars: int  # 1-5
+    reason: Optional[str] = None  # optional low-rating feedback
 
 
 class EngagementUpdate(BaseModel):
     watch_completion: float = 0.0
     revisit_count: int = 0
     completed: bool = False
+    time_spent: int = 0  # seconds
 
 
 @router.get("/topic/{topic_id}")
@@ -67,21 +69,31 @@ def rate(resource_id: int, data: RatingCreate, current_user: User = Depends(get_
     rating = db.query(Rating).filter_by(user_id=current_user.id, resource_id=resource_id).first()
     if rating:
         rating.stars = data.stars
+        rating.reason = data.reason
     else:
-        db.add(Rating(user_id=current_user.id, resource_id=resource_id, stars=data.stars))
+        db.add(Rating(user_id=current_user.id, resource_id=resource_id, stars=data.stars, reason=data.reason))
     db.commit()
     return {"ok": True}
 
 
 @router.post("/{resource_id}/engage")
 def engage(resource_id: int, data: EngagementUpdate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    from datetime import datetime
     eng = db.query(Engagement).filter_by(user_id=current_user.id, resource_id=resource_id).first()
     if eng:
         eng.watch_completion = data.watch_completion
         eng.revisit_count = data.revisit_count
+        eng.time_spent = max(eng.time_spent, data.time_spent)
+        if data.completed and not eng.completed:
+            eng.completed_at = datetime.utcnow()
         eng.completed = data.completed
     else:
-        db.add(Engagement(user_id=current_user.id, resource_id=resource_id, **data.model_dump()))
+        db.add(Engagement(
+            user_id=current_user.id, resource_id=resource_id,
+            watch_completion=data.watch_completion, revisit_count=data.revisit_count,
+            completed=data.completed, time_spent=data.time_spent,
+            completed_at=datetime.utcnow() if data.completed else None,
+        ))
     db.commit()
     return {"ok": True}
 
@@ -90,7 +102,16 @@ def engage(resource_id: int, data: EngagementUpdate, current_user: User = Depend
 @router.get("/pending", dependencies=[Depends(require_admin)])
 def pending_resources(db: Session = Depends(get_db)):
     resources = db.query(Resource).filter_by(status=ResourceStatus.pending).all()
-    return [{"id": r.id, "title": r.title, "url": r.url, "uploader_id": r.uploader_id} for r in resources]
+    return [{
+        "id": r.id,
+        "title": r.title,
+        "url": r.url,
+        "type": r.resource_type,
+        "topic": r.topic.title.replace(r.topic.title.split(":")[0] + ": ", "") if r.topic else "",
+        "course": r.topic.title.split(":")[0] if r.topic else "",
+        "uploader": r.uploader.username if r.uploader else "unknown",
+        "submitted": r.created_at.strftime("%b %d, %Y") if r.created_at else "",
+    } for r in resources]
 
 
 @router.post("/{resource_id}/review")
@@ -101,3 +122,20 @@ def review(resource_id: int, approved: bool, _: User = Depends(require_admin), d
     resource.status = ResourceStatus.approved if approved else ResourceStatus.rejected
     db.commit()
     return {"status": resource.status}
+
+
+@router.get("/admin/all", dependencies=[Depends(require_admin)])
+def all_resources(db: Session = Depends(get_db)):
+    """All resources with status — for admin overview."""
+    resources = db.query(Resource).order_by(Resource.created_at.desc()).all()
+    return [{
+        "id": r.id,
+        "title": r.title,
+        "url": r.url,
+        "type": r.resource_type,
+        "status": r.status.value,
+        "topic": r.topic.title.replace(r.topic.title.split(":")[0] + ": ", "") if r.topic else "",
+        "course": r.topic.title.split(":")[0] if r.topic else "",
+        "uploader": r.uploader.username if r.uploader else "unknown",
+        "submitted": r.created_at.strftime("%b %d, %Y") if r.created_at else "",
+    } for r in resources]

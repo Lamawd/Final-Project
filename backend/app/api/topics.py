@@ -71,3 +71,39 @@ def mark_progress(topic_id: int, completed: bool = True,
 def my_progress(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     rows = db.query(UserProgress).filter_by(user_id=current_user.id).all()
     return [{"topic_id": r.topic_id, "completed": r.completed} for r in rows]
+
+
+@router.get("/progress/activity")
+def my_activity(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Returns daily completed-resource counts for last 30 days + total stats."""
+    from datetime import datetime, timedelta
+    from app.models.models import Engagement, Resource, Topic, TopicPrerequisite
+
+    # Daily activity: count resources completed per day (last 30 days)
+    since = datetime.utcnow() - timedelta(days=29)
+    engagements = (
+        db.query(Engagement)
+        .filter_by(user_id=current_user.id, completed=True)
+        .filter(Engagement.completed_at >= since)
+        .all()
+    )
+    daily = {}
+    for e in engagements:
+        if e.completed_at:
+            day = e.completed_at.strftime("%Y-%m-%d")
+            daily[day] = daily.get(day, 0) + 1
+
+    # Total stats
+    total_completed_resources = db.query(Engagement).filter_by(
+        user_id=current_user.id, completed=True).count()
+    total_topics_done = db.query(UserProgress).filter_by(
+        user_id=current_user.id, completed=True).count()
+    total_time = db.query(Engagement).filter_by(user_id=current_user.id).all()
+    total_seconds = sum(e.time_spent or 0 for e in total_time)
+
+    return {
+        "daily": daily,          # {"2026-06-20": 3, ...}
+        "total_resources": total_completed_resources,
+        "total_topics": total_topics_done,
+        "total_minutes": total_seconds // 60,
+    }

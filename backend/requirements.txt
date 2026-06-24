@@ -9,4 +9,7 @@ pydantic[email]==2.7.1
 pydantic-core==2.18.2
 numpy==2.0.2
 scikit-learn==1.5.2
+aiosmtplib==3.0.1
 python-dotenv==1.0.1
+psycopg2-binary==2.9.9
+

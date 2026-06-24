@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "../api/client";
 import { COURSES, courseOf } from "../courses";
 
-/** Extract YouTube video ID. Returns null for playlists or non-YT URLs. */
 function ytId(url) {
   try {
     const u = new URL(url);
@@ -12,7 +11,6 @@ function ytId(url) {
     if (u.hostname.includes("youtube.com")) {
       if (u.pathname.startsWith("/watch") && u.searchParams.get("v")) return u.searchParams.get("v");
       if (u.pathname.startsWith("/embed/")) return u.pathname.split("/")[2];
-      // playlists — not embeddable
     }
   } catch {}
   return null;
@@ -23,21 +21,23 @@ export default function TopicDetail() {
   const navigate = useNavigate();
   const topicId = parseInt(id);
 
-  const [topic, setTopic]           = useState(null);
-  const [resources, setResources]   = useState([]);
-  const [recs, setRecs]             = useState([]);
-  const [stars, setStars]           = useState({});
+  const [topic, setTopic]               = useState(null);
+  const [resources, setResources]       = useState([]);
+  const [recs, setRecs]                 = useState([]);
+  const [stars, setStars]               = useState({});
   const [resourceDone, setResourceDone] = useState({});
   const [topicCompleted, setTopicCompleted] = useState(false);
-  const [allDone, setAllDone]       = useState(false);
-  const [activeVideo, setActiveVideo] = useState(null);
-  const [showSuggest, setShowSuggest] = useState(false);
-  const [suggest, setSuggest]       = useState({ title: "", url: "", resource_type: "video" });
-  const [suggestMsg, setSuggestMsg] = useState("");
-  const [suggestErr, setSuggestErr] = useState("");
+  const [allDone, setAllDone]           = useState(false);
+  const [activeVideo, setActiveVideo]   = useState(null);
+  const [showSuggest, setShowSuggest]   = useState(false);
+  const [suggest, setSuggest]           = useState({ title: "", url: "", resource_type: "video" });
+  const [suggestMsg, setSuggestMsg]     = useState("");
+  const [suggestErr, setSuggestErr]     = useState("");
+  const [ratingModal, setRatingModal]   = useState(null);
 
   const course = topic ? COURSES.find((c) => c.id === courseOf(topic)) : null;
 
+  // Fetch topic data
   useEffect(() => {
     api.get(`/topics/${id}`).then((r) => setTopic(r.data));
     api.get(`/resources/topic/${id}`).then((r) => setResources(r.data));
@@ -48,31 +48,66 @@ export default function TopicDetail() {
     }).catch(() => {});
   }, [id]);
 
+  // Track active time on this topic page (while tab is visible)
+  const pageStart = useRef(null);
+  const pageTime  = useRef(0);
+
+  useEffect(() => {
+    if (resources.length === 0) return;
+
+    pageStart.current = Date.now();
+
+    const pause  = () => { if (pageStart.current) { pageTime.current += Date.now() - pageStart.current; pageStart.current = null; } };
+    const resume = () => { if (!pageStart.current) pageStart.current = Date.now(); };
+    const flush  = () => {
+      pause();
+      const secs = Math.round(pageTime.current / 1000);
+      if (secs > 0) {
+        // Send time against first resource as a proxy for the topic session
+        const rid = resources[0]?.id;
+        if (rid) api.post(`/resources/${rid}/engage`, { watch_completion: 0, revisit_count: 0, completed: !!resourceDone[rid], time_spent: secs });
+      }
+    };
+
+    document.addEventListener("visibilitychange", () => document.hidden ? pause() : resume());
+    window.addEventListener("beforeunload", flush);
+    return () => { flush(); window.removeEventListener("beforeunload", flush); };
+  }, [resources]);
+
   useEffect(() => {
     if (resources.length > 0 && resources.every((r) => resourceDone[r.id])) {
       setAllDone(true);
     }
   }, [resourceDone, resources]);
 
+  const stopTimer = (rid) => {};
+  const getTime = (rid) => 0;
+
   const markResourceDone = async (resource) => {
     const next = !resourceDone[resource.id];
+    stopTimer(resource.id);
     await api.post(`/resources/${resource.id}/engage`, {
       watch_completion: next ? 1.0 : 0.0,
       revisit_count: 0,
       completed: next,
+      time_spent: getTime(resource.id),
     });
     setResourceDone((prev) => ({ ...prev, [resource.id]: next }));
   };
 
-  const rate = async (resource_id, s) => {
-    await api.post(`/resources/${resource_id}/rate`, { stars: s });
+  const rate = async (resource_id, s, reason = null) => {
+    await api.post(`/resources/${resource_id}/rate`, { stars: s, reason });
     setStars((prev) => ({ ...prev, [resource_id]: s }));
+  };
+
+  const handleStarClick = (resource_id, s) => {
+    if (s <= 2) setRatingModal({ resource_id, stars: s });
+    else rate(resource_id, s);
   };
 
   const submitSuggest = async (e) => {
     e.preventDefault();
     setSuggestErr("");
-    // Frontend URL safety check
     try {
       const u = new URL(suggest.url);
       if (!["http:", "https:"].includes(u.protocol)) throw new Error();
@@ -200,7 +235,7 @@ export default function TopicDetail() {
                       <span
                         key={s}
                         className={(stars[r.id] || 0) >= s ? "star on" : "star"}
-                        onClick={() => rate(r.id, s)}
+                        onClick={() => handleStarClick(r.id, s)}
                       >★</span>
                     ))}
                   </div>
@@ -241,7 +276,7 @@ export default function TopicDetail() {
                     <span
                       key={s}
                       className={(stars[r.id] || 0) >= s ? "star on" : "star"}
-                      onClick={() => rate(r.id, s)}
+                      onClick={() => handleStarClick(r.id, s)}
                     >★</span>
                   ))}
                 </div>
@@ -257,7 +292,7 @@ export default function TopicDetail() {
 
       {recs.length > 0 && (
         <section style={{ marginBottom: 32 }}>
-          <h3 className="section-title">✨ Recommended for You</h3>
+          <h3 className="section-title">✨ Suggested for You</h3>
           <div className="resource-cards">
             {recs.map((r, i) => (
               <motion.div
@@ -271,7 +306,7 @@ export default function TopicDetail() {
                   <a href={r.url} target="_blank" rel="noreferrer" className="resource-link">
                     {r.title}
                   </a>
-                  <span className="rec-score">⭐ {Number(r.score).toFixed(1)}</span>
+                  <span className="rec-score">⭐ {Number(r.score).toFixed(2)}</span>
                 </div>
               </motion.div>
             ))}
@@ -280,7 +315,10 @@ export default function TopicDetail() {
       )}
 
       <section style={{ marginBottom: 40 }}>
-        <button className="suggest-toggle" onClick={() => { setShowSuggest(!showSuggest); setSuggestMsg(""); setSuggestErr(""); }}>
+        <button
+          className="suggest-toggle"
+          onClick={() => { setShowSuggest(!showSuggest); setSuggestMsg(""); setSuggestErr(""); }}
+        >
           {showSuggest ? "▲ Cancel" : "+ Suggest a Resource"}
         </button>
         {suggestMsg && <p className="success-msg" style={{ marginTop: 10 }}>{suggestMsg}</p>}
@@ -306,7 +344,10 @@ export default function TopicDetail() {
                 onChange={(e) => setSuggest({ ...suggest, url: e.target.value })}
                 required
               />
-              <select value={suggest.resource_type} onChange={(e) => setSuggest({ ...suggest, resource_type: e.target.value })}>
+              <select
+                value={suggest.resource_type}
+                onChange={(e) => setSuggest({ ...suggest, resource_type: e.target.value })}
+              >
                 <option value="video">Video</option>
                 <option value="article">Article</option>
               </select>
@@ -316,6 +357,45 @@ export default function TopicDetail() {
           )}
         </AnimatePresence>
       </section>
+
+      <AnimatePresence>
+        {ratingModal && (
+          <LowRatingModal
+            stars={ratingModal.stars}
+            onSubmit={(reason) => { rate(ratingModal.resource_id, ratingModal.stars, reason); setRatingModal(null); }}
+            onSkip={() => { rate(ratingModal.resource_id, ratingModal.stars); setRatingModal(null); }}
+          />
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+function LowRatingModal({ stars, onSubmit, onSkip }) {
+  const [reason, setReason] = useState("");
+  return (
+    <motion.div
+      className="modal-overlay"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="modal-box"
+        initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.88, opacity: 0 }}
+      >
+        <h3>{"⭐".repeat(stars)} Low rating</h3>
+        <p style={{ margin: "10px 0" }}>Mind telling us why? <span className="muted">(optional)</span></p>
+        <textarea
+          className="reason-input"
+          placeholder="e.g. Hard to follow, outdated content, poor audio…"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={3}
+        />
+        <div className="modal-actions">
+          <button className="btn btn-primary" onClick={() => onSubmit(reason || null)}>Submit</button>
+          <button className="btn" onClick={onSkip}>Skip</button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }

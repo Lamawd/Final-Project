@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ username: "", password: "" });
+  const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -14,10 +14,10 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     try {
-      await login(form.username, form.password);
+      await login(form.email, form.password);
       navigate("/");
     } catch {
-      setError("Invalid username or password");
+      setError("Invalid email or password");
     } finally {
       setLoading(false);
     }
@@ -37,9 +37,10 @@ export default function Login() {
           <p className="auth-sub">Log in to continue learning</p>
           <form onSubmit={submit}>
             <input
-              placeholder="Username"
-              value={form.username}
-              onChange={(e) => setForm({ ...form, username: e.target.value })}
+              type="email"
+              placeholder="Email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
               required
             />
             <input
@@ -55,6 +56,7 @@ export default function Login() {
             </button>
           </form>
           <p className="auth-switch">No account? <Link to="/register">Register</Link></p>
+          <p className="auth-switch"><Link to="/forgot-password">Forgot password?</Link></p>
         </motion.div>
       </div>
     </div>
@@ -65,7 +67,7 @@ export function HeroBrand() {
   const features = [
     { icon: "🌳", text: "5 structured courses" },
     { icon: "✅", text: "Track your progress" },
-    { icon: "✨", text: "Personalised recommendations" },
+    { icon: "✨", text: "Resource suggestions based on your activity" },
     { icon: "📹", text: "Watch videos in-site" },
   ];
   return (

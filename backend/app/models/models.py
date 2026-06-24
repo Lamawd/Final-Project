@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Enum
+    Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Text, Enum, Index
 )
 from sqlalchemy.orm import relationship, DeclarativeBase
 from datetime import datetime
@@ -62,10 +62,15 @@ class Resource(Base):
     uploader_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     title = Column(String, nullable=False)
     url = Column(String, nullable=False)
-    resource_type = Column(String)  # video, article, etc.
+    resource_type = Column(String)
     status = Column(Enum(ResourceStatus), default=ResourceStatus.pending)
     version = Column(Integer, default=1)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_resource_topic_status", "topic_id", "status"),
+        Index("ix_resource_status", "status"),
+    )
 
     topic = relationship("Topic", back_populates="resources")
     uploader = relationship("User", back_populates="uploads")
@@ -78,6 +83,7 @@ class Rating(Base):
     user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
     resource_id = Column(Integer, ForeignKey("resources.id"), primary_key=True)
     stars = Column(Integer, nullable=False)  # 1-5
+    reason = Column(String, nullable=True)   # optional low-rating feedback
 
     user = relationship("User", back_populates="ratings")
     resource = relationship("Resource", back_populates="ratings")
@@ -88,9 +94,16 @@ class Engagement(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     resource_id = Column(Integer, ForeignKey("resources.id"))
-    watch_completion = Column(Float, default=0.0)  # 0.0 - 1.0
+    watch_completion = Column(Float, default=0.0)
     revisit_count = Column(Integer, default=0)
     completed = Column(Boolean, default=False)
+    time_spent = Column(Integer, default=0)
+    completed_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_engagement_user", "user_id"),
+        Index("ix_engagement_user_completed", "user_id", "completed"),
+    )
 
     resource = relationship("Resource", back_populates="engagements")
 
@@ -104,6 +117,14 @@ class UserProgress(Base):
 
     user = relationship("User", back_populates="progress")
     topic = relationship("Topic", back_populates="progress")
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+    id         = Column(Integer, primary_key=True)
+    user_id    = Column(Integer, ForeignKey("users.id"), nullable=False)
+    token      = Column(String, unique=True, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
 
 
 class OnboardingQuestion(Base):

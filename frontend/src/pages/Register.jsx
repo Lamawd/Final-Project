@@ -3,9 +3,11 @@ import api from "../api/client";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { HeroBrand } from "./Login";
+import { useAuth } from "../context/AuthContext";
 
 export default function Register() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [form, setForm] = useState({ username: "", email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -15,6 +17,7 @@ export default function Register() {
     setLoading(true);
     try {
       await api.post("/auth/register", form);
+      await login(form.email, form.password);
       navigate("/onboarding");
     } catch (err) {
       setError(err.response?.data?.detail || "Registration failed");

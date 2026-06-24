@@ -23,23 +23,30 @@ export default function Onboarding() {
   if (questions.length === 0) return <p className="loading">Loading quiz…</p>;
 
   return (
-    <div className="page" style={{ maxWidth: 560 }}>
-      <h2>Quick Setup</h2>
-      <p className="muted">Answer a few questions so we can personalise your learning path.</p>
-      <form onSubmit={submit} className="onboarding-form">
-        {questions.map((q) => (
-          <div key={q.id} className="quiz-question">
-            <label>{q.question}</label>
-            <input
-              placeholder="Your answer"
-              value={answers[q.id] || ""}
-              onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
-              required
-            />
-          </div>
-        ))}
-        <button type="submit" className="btn btn-primary">Start Learning →</button>
-      </form>
+    <div className="onboarding-page">
+      <div className="onboarding-card">
+        <div className="onboarding-header">
+          <div className="onboarding-icon">🎯</div>
+          <h2>Let's personalise your path</h2>
+          <p className="muted">Answer a few quick questions so we can tailor your recommendations.</p>
+        </div>
+        <form onSubmit={submit} className="onboarding-form">
+          {questions.map((q, i) => (
+            <div key={q.id} className="quiz-question">
+              <label><span className="quiz-num">{i + 1}</span>{q.question}</label>
+              <input
+                placeholder="Your answer…"
+                value={answers[q.id] || ""}
+                onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
+                required
+              />
+            </div>
+          ))}
+          <button type="submit" className="btn btn-primary btn-full" style={{ marginTop: 8 }}>
+            Start Learning →
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
