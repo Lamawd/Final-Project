@@ -12,6 +12,7 @@ import SuggestPage from "./pages/SuggestPage";
 import Progress from "./pages/Progress";
 import UserProfile from "./pages/UserProfile";
 import Courses from "./pages/Courses";
+import Topics from "./pages/Topics";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
@@ -46,6 +47,7 @@ function Layout() {
         <Route path="/onboarding" element={<Protected><Onboarding /></Protected>} />
         <Route path="/" element={<Protected><Home /></Protected>} />
         <Route path="/courses" element={<Protected><Courses /></Protected>} />
+        <Route path="/topics" element={<Protected><Topics /></Protected>} />
         <Route path="/courses/:courseId" element={<Protected><CourseDetail /></Protected>} />
         <Route path="/topics/:id" element={<Protected><TopicDetail /></Protected>} />
         <Route path="/progress" element={<Protected><Progress /></Protected>} />
