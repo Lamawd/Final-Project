@@ -6,8 +6,8 @@ import { COURSES, courseOf } from "../courses";
 
 const TESTIMONIALS = [
   { name: "Đỗ Nam Khánh", role: "ICT Student", text: "The roadmap style makes it so clear what to learn next. I finished DSA in two weeks!", avatar: null, photo: "/friendA.jpeg" },
-  { name: "Priya S.", role: "Self-taught Dev", text: "Love how every topic links to real videos and articles. No more searching around.", avatar: "P" },
-  { name: "Jake T.", role: "Bootcamp Grad", text: "The recommendation engine actually works — it surfaced SQL topics I was missing.", avatar: "J" },
+  { name: "Nguyễn Đức Thành", role: "BIT Student", text: "Love how every topic links to real videos and articles. No more searching around.", avatar: null, photo: "/friendC.jpeg" },
+  { name: "Dương Tuấn Kiệt", role: "DS Student", text: "The recommendation engine actually works — it surfaced SQL topics I was missing.", avatar: null, photo: "/friendB.jpeg" },
 ];
 
 const FEATURES = [
