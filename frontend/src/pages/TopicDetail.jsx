@@ -24,7 +24,8 @@ export default function TopicDetail() {
   const [topic, setTopic]               = useState(null);
   const [resources, setResources]       = useState([]);
   const [recs, setRecs]                 = useState([]);
-  const [stars, setStars]               = useState({});
+  const [stars, setStars]               = useState({});       // user's own rating
+  const [overallRating, setOverallRating] = useState({});      // {id: {avg, count}}
   const [resourceDone, setResourceDone] = useState({});
   const [topicCompleted, setTopicCompleted] = useState(false);
   const [allDone, setAllDone]           = useState(false);
@@ -40,7 +41,12 @@ export default function TopicDetail() {
   // Fetch topic data
   useEffect(() => {
     api.get(`/topics/${id}`).then((r) => setTopic(r.data));
-    api.get(`/resources/topic/${id}`).then((r) => setResources(r.data));
+    api.get(`/resources/topic/${id}`).then((r) => {
+      setResources(r.data);
+      const map = {};
+      r.data.forEach((res) => { map[res.id] = { avg: res.avg_rating, count: res.rating_count }; });
+      setOverallRating(map);
+    });
     api.get(`/recommend/topic/${id}`).then((r) => setRecs(r.data)).catch(() => {});
     api.get("/topics/progress/me").then((r) => {
       const found = r.data.find((p) => p.topic_id === topicId);
@@ -96,8 +102,9 @@ export default function TopicDetail() {
   };
 
   const rate = async (resource_id, s, reason = null) => {
-    await api.post(`/resources/${resource_id}/rate`, { stars: s, reason });
+    const res = await api.post(`/resources/${resource_id}/rate`, { stars: s, reason });
     setStars((prev) => ({ ...prev, [resource_id]: s }));
+    setOverallRating((prev) => ({ ...prev, [resource_id]: { avg: res.data.avg_rating, count: res.data.rating_count } }));
   };
 
   const handleStarClick = (resource_id, s) => {
@@ -238,6 +245,11 @@ export default function TopicDetail() {
                         onClick={() => handleStarClick(r.id, s)}
                       >★</span>
                     ))}
+                    {overallRating[r.id]?.count > 0 && (
+                      <span className="overall-rating">
+                        {overallRating[r.id].avg}★ ({overallRating[r.id].count} {overallRating[r.id].count === 1 ? "review" : "reviews"})
+                      </span>
+                    )}
                   </div>
                 </motion.div>
               );
@@ -279,6 +291,11 @@ export default function TopicDetail() {
                       onClick={() => handleStarClick(r.id, s)}
                     >★</span>
                   ))}
+                  {overallRating[r.id]?.count > 0 && (
+                    <span className="overall-rating">
+                      {overallRating[r.id].avg}★ ({overallRating[r.id].count} {overallRating[r.id].count === 1 ? "review" : "reviews"})
+                    </span>
+                  )}
                 </div>
               </motion.div>
             ))}

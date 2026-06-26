@@ -50,7 +50,13 @@ class EngagementUpdate(BaseModel):
 @router.get("/topic/{topic_id}")
 def get_by_topic(topic_id: int, db: Session = Depends(get_db)):
     resources = db.query(Resource).filter_by(topic_id=topic_id, status=ResourceStatus.approved).all()
-    return [{"id": r.id, "title": r.title, "url": r.url, "type": r.resource_type} for r in resources]
+    result = []
+    for r in resources:
+        stars = [rt.stars for rt in r.ratings]
+        avg = round(sum(stars) / len(stars), 1) if stars else 0.0
+        result.append({"id": r.id, "title": r.title, "url": r.url, "type": r.resource_type,
+                        "avg_rating": avg, "rating_count": len(stars)})
+    return result
 
 
 @router.post("/", status_code=201)
@@ -73,7 +79,9 @@ def rate(resource_id: int, data: RatingCreate, current_user: User = Depends(get_
     else:
         db.add(Rating(user_id=current_user.id, resource_id=resource_id, stars=data.stars, reason=data.reason))
     db.commit()
-    return {"ok": True}
+    all_stars = [r.stars for r in db.query(Rating).filter_by(resource_id=resource_id).all()]
+    avg = round(sum(all_stars) / len(all_stars), 1) if all_stars else 0.0
+    return {"ok": True, "avg_rating": avg, "rating_count": len(all_stars)}
 
 
 @router.post("/{resource_id}/engage")
