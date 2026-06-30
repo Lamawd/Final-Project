@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from typing import Optional
 from pydantic import BaseModel, EmailStr, field_validator
 from app.core.database import get_db
 from app.core.security import hash_password, verify_password, create_access_token, get_current_user, require_admin
