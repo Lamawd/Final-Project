@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
+import { CheckCircle } from "lucide-react";
 import api from "../api/client";
 import { HeroBrand } from "./Login";
 
@@ -35,7 +36,7 @@ export default function ResetPassword() {
       if (data.dev_token) {
         setDevToken(data.dev_token);
       }
-      setToken(""); setResendMsg("✅ New code sent! Check your inbox.");
+      setToken(""); setResendMsg("New code sent! Check your inbox.");
       startTimer();
     } catch {
       setResendMsg("Failed to resend. Try again.");
@@ -65,7 +66,9 @@ export default function ResetPassword() {
         <motion.div className="auth-form-box" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}>
           {done ? (
             <>
-              <h2>✅ Password reset!</h2>
+              <h2 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <CheckCircle size={22} color="#10b981" /> Password reset!
+              </h2>
               <p className="auth-sub">Redirecting to login…</p>
             </>
           ) : (

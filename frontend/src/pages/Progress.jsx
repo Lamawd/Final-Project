@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { CheckCircle, Trophy, Clock, CalendarDays, BookOpen } from "lucide-react";
 import api from "../api/client";
 import { COURSES, courseOf } from "../courses";
+import CourseIcon from "../components/CourseIcon";
 
 /** Build array of last N days as YYYY-MM-DD strings */
 function lastNDays(n) {
@@ -44,7 +46,6 @@ export default function Progress() {
   const days = lastNDays(30);
   const daily = activity?.daily || {};
 
-  // Group completed topics by course
   const courseProgress = COURSES.map((course) => {
     const courseTopics = topics.filter((t) => courseOf(t) === course.id);
     const done = courseTopics.filter((t) => progress[t.id]).length;
@@ -52,9 +53,9 @@ export default function Progress() {
   });
 
   const stats = [
-    { label: "Resources Done",  value: activity?.total_resources ?? "—", icon: "✅" },
-    { label: "Topics Completed", value: activity?.total_topics ?? "—",    icon: "🏆" },
-    { label: "Minutes on Opic",   value: activity?.total_minutes ?? "—",    icon: "⏱️" },
+    { label: "Resources Done",   value: activity?.total_resources ?? "—", Icon: CheckCircle, color: "#10b981" },
+    { label: "Topics Completed", value: activity?.total_topics ?? "—",    Icon: Trophy,       color: "#f59e0b" },
+    { label: "Minutes on Opic",  value: activity?.total_minutes ?? "—",   Icon: Clock,        color: "#6366f1" },
   ];
 
   return (
@@ -74,7 +75,9 @@ export default function Progress() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.08 }}
           >
-            <span className="stat-icon">{s.icon}</span>
+            <span className="stat-icon" style={{ color: s.color, background: s.color + "18" }}>
+              <s.Icon size={22} strokeWidth={1.8} />
+            </span>
             <span className="stat-value">{s.value}</span>
             <span className="stat-label">{s.label}</span>
           </motion.div>
@@ -88,7 +91,10 @@ export default function Progress() {
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
       >
-        <h3 className="section-title">📅 Activity — Last 30 Days</h3>
+        <h3 className="section-title">
+          <CalendarDays size={16} className="section-title-icon" />
+          Activity — Last 30 Days
+        </h3>
         <div className="heatmap-grid">
           {days.map((day) => (
             <HeatmapCell key={day} date={day} count={daily[day] || 0} />
@@ -105,13 +111,18 @@ export default function Progress() {
 
       {/* Per-course progress bars */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
-        <h3 className="section-title" style={{ marginBottom: 16 }}>📚 Course Progress</h3>
+        <h3 className="section-title" style={{ marginBottom: 16 }}>
+          <BookOpen size={16} className="section-title-icon" />
+          Course Progress
+        </h3>
         <div className="course-progress-list">
           {courseProgress.map((c) => {
             const pct = c.total ? Math.round((c.done / c.total) * 100) : 0;
             return (
               <div key={c.id} className="course-progress-row">
-                <span className="course-progress-icon">{c.icon}</span>
+                <span className="course-progress-icon">
+                  <CourseIcon icon={c.icon} color={c.color} size={24} />
+                </span>
                 <div className="course-progress-body">
                   <div className="course-progress-top">
                     <span className="course-progress-name">{c.title}</span>

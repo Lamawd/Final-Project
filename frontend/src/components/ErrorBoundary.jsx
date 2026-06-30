@@ -1,5 +1,6 @@
 import { Component } from "react";
 import { Link } from "react-router-dom";
+import { AlertTriangle } from "lucide-react";
 
 export default class ErrorBoundary extends Component {
   state = { error: null };
@@ -16,7 +17,9 @@ export default class ErrorBoundary extends Component {
     if (this.state.error) {
       return (
         <div style={{ textAlign: "center", padding: "80px 24px" }}>
-          <div style={{ fontSize: "3rem", marginBottom: 16 }}>⚠️</div>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+            <AlertTriangle size={52} color="#f59e0b" strokeWidth={1.5} />
+          </div>
           <h2 style={{ marginBottom: 8 }}>Something went wrong</h2>
           <p style={{ color: "#6b7280", marginBottom: 24 }}>
             {this.state.error?.message || "An unexpected error occurred."}

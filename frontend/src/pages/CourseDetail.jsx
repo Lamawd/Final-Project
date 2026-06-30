@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { Lock, AlertTriangle, Check, ArrowRight } from "lucide-react";
 import api from "../api/client";
 import { COURSES, courseOf } from "../courses";
+import CourseIcon from "../components/CourseIcon";
 
 export default function CourseDetail() {
   const { courseId } = useParams();
@@ -54,7 +56,9 @@ export default function CourseDetail() {
         className="course-detail-header"
         style={{ borderLeft: `4px solid ${course.color}` }}
       >
-        <span className="course-icon-lg">{course.icon}</span>
+        <span className="course-icon-lg">
+          <CourseIcon icon={course.icon} color={course.color} size={44} />
+        </span>
         <div>
           <h2>{course.title}</h2>
           <p>{course.description}</p>
@@ -77,7 +81,7 @@ export default function CourseDetail() {
               style={{ "--c": course.color }}
             >
               <div className="roadmap-dot">
-                {done ? "✓" : i + 1}
+                {done ? <Check size={14} /> : i + 1}
               </div>
               <div className="roadmap-body">
                 <span className="roadmap-title">{topic.title.replace(/^[^:]+: /, "")}</span>
@@ -86,10 +90,15 @@ export default function CourseDetail() {
                   {topic.resource_count > 0 && (
                     <span className="resource-count-badge">{topic.resource_count} resources</span>
                   )}
-                  {hasUnmet && <span className="locked-badge">🔒 Complete prerequisites first</span>}
+                  {hasUnmet && (
+                    <span className="locked-badge">
+                      <Lock size={11} style={{ display: "inline", marginRight: 3 }} />
+                      Complete prerequisites first
+                    </span>
+                  )}
                 </div>
               </div>
-              <span className="roadmap-arrow">{done ? "✓" : "→"}</span>
+              <span className="roadmap-arrow">{done ? <Check size={15} /> : <ArrowRight size={15} />}</span>
             </motion.div>
           );
         })}
@@ -111,7 +120,10 @@ export default function CourseDetail() {
               exit={{ scale: 0.85, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3>⚠️ Prerequisites Required</h3>
+              <h3>
+                <AlertTriangle size={18} color="#f59e0b" style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
+                Prerequisites Required
+              </h3>
               <p>
                 <strong>{gateModal.topic.title.replace(/^[^:]+: /, "")}</strong> requires you to
                 complete these topics first:

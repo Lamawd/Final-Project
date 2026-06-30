@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { CheckCircle, TrendingUp, Sparkles, PlayCircle, ArrowRight } from "lucide-react";
 
 export default function Login() {
   const { login } = useAuth();
@@ -65,10 +66,10 @@ export default function Login() {
 
 export function HeroBrand() {
   const features = [
-    { icon: "🌳", text: "5 structured courses" },
-    { icon: "✅", text: "Track your progress" },
-    { icon: "✨", text: "Resource suggestions based on your activity" },
-    { icon: "📹", text: "Watch videos in-site" },
+    { Icon: TrendingUp,  text: "5 structured courses",                         color: "#a5b4fc" },
+    { Icon: CheckCircle, text: "Track your progress",                           color: "#6ee7b7" },
+    { Icon: Sparkles,    text: "Resource suggestions based on your activity",   color: "#fde68a" },
+    { Icon: PlayCircle,  text: "Watch videos in-site",                          color: "#f9a8d4" },
   ];
   return (
     <div className="auth-hero">
@@ -84,14 +85,17 @@ export function HeroBrand() {
           and guides you through what's next.
         </p>
         <ul className="hero-features">
-          {features.map((f) => (
+          {features.map((f, idx) => (
             <motion.li
               key={f.text}
               initial={{ opacity: 0, x: -16 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 + features.indexOf(f) * 0.1 }}
+              transition={{ delay: 0.3 + idx * 0.1 }}
             >
-              <span>{f.icon}</span> {f.text}
+              <span className="hero-feature-icon" style={{ color: f.color }}>
+                <f.Icon size={16} strokeWidth={2} />
+              </span>
+              {f.text}
             </motion.li>
           ))}
         </ul>

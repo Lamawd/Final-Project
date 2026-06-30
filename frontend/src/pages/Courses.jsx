@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import api from "../api/client";
 import { COURSES, courseOf } from "../courses";
+import CourseIcon from "../components/CourseIcon";
 
 export default function Courses() {
   const [progress, setProgress] = useState({});
@@ -48,7 +49,9 @@ export default function Courses() {
               className="course-card"
               style={{ "--course-color": course.color, "--course-light": course.light }}
             >
-              <div className="course-icon">{course.icon}</div>
+              <div className="course-icon">
+                <CourseIcon icon={course.icon} color={course.color} size={36} />
+              </div>
               <div className="course-body">
                 <h3>{course.title}</h3>
                 <p>{course.description}</p>

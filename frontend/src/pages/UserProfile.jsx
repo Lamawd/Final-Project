@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Clock, CheckCircle, XCircle, Inbox, Settings, Lock, Palette, Plus, X } from "lucide-react";
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { COURSES, courseOf } from "../courses";
 
 const STATUS_COLOR = { approved: "#10b981", pending: "#f59e0b", rejected: "#ef4444" };
-const STATUS_LABEL = { approved: "✅ Approved", pending: "⏳ Pending", rejected: "❌ Rejected" };
+const STATUS_ICON  = { approved: CheckCircle, pending: Clock, rejected: XCircle };
+const STATUS_LABEL = { approved: "Approved", pending: "Pending", rejected: "Rejected" };
 const EMPTY_ROW = () => ({ course: "", topic_id: "", title: "", url: "", resource_type: "video" });
 
 export default function UserProfile() {
   const { user, logout } = useAuth();
-  const [tab, setTab] = useState("contributions"); // "contributions" | "settings"
+  const [tab, setTab] = useState("contributions");
 
   // Dark mode
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem("darkMode") === "true");
@@ -70,7 +72,7 @@ export default function UserProfile() {
     setSubmitting(false);
     const failedIdx = new Set(out.filter((r) => !r.ok).map((r) => r.i));
     setRows(failedIdx.size === 0 ? [EMPTY_ROW()] : (prev) => prev.filter((_, i) => failedIdx.has(i)));
-    if (failedIdx.size === 0) loadSubmissions(); // refresh list after success
+    if (failedIdx.size === 0) loadSubmissions();
   };
 
   // Change password
@@ -87,7 +89,7 @@ export default function UserProfile() {
         current_password: pwForm.current_password,
         new_password: pwForm.new_password,
       });
-      setPwMsg("Password updated ✅");
+      setPwMsg("Password updated");
       setPwForm({ current_password: "", new_password: "", confirm: "" });
     } catch (err) {
       setPwErr(err.response?.data?.detail || "Failed");
@@ -115,7 +117,7 @@ export default function UserProfile() {
         </div>
         <div className="profile-header-actions">
           <button className={`toggle-btn ${darkMode ? "active" : ""}`} onClick={() => setDarkMode(!darkMode)}>
-            {darkMode ? "☀️ Light" : "🌙 Dark"}
+            {darkMode ? "Light mode" : "Dark mode"}
           </button>
           <button className="btn" style={{ background: "#fee2e2", color: "#991b1b" }} onClick={logout}>
             Logout
@@ -126,11 +128,13 @@ export default function UserProfile() {
       {/* Tabs */}
       <div className="profile-tabs">
         <button className={`profile-tab ${tab === "contributions" ? "active" : ""}`} onClick={() => setTab("contributions")}>
-          📬 Contributions
+          <Inbox size={15} style={{ display: "inline", marginRight: 5, verticalAlign: "middle" }} />
+          Contributions
           {pending.length > 0 && <span className="tab-badge">{pending.length}</span>}
         </button>
         <button className={`profile-tab ${tab === "settings" ? "active" : ""}`} onClick={() => setTab("settings")}>
-          ⚙️ Settings
+          <Settings size={15} style={{ display: "inline", marginRight: 5, verticalAlign: "middle" }} />
+          Settings
         </button>
       </div>
 
@@ -147,7 +151,8 @@ export default function UserProfile() {
 
               {successCount > 0 && (
                 <motion.div className="all-done-banner" style={{ marginBottom: 16 }} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                  🎉 {successCount} resource{successCount > 1 ? "s" : ""} submitted for review!
+                  <CheckCircle size={15} style={{ display: "inline", marginRight: 6 }} />
+                  {successCount} resource{successCount > 1 ? "s" : ""} submitted for review!
                 </motion.div>
               )}
 
@@ -165,13 +170,15 @@ export default function UserProfile() {
                           <span className="suggest-row-num">#{i + 1}</span>
                           {rows.length > 1 && (
                             <button type="button" className="remove-row-btn"
-                              onClick={() => setRows((p) => p.filter((_, idx) => idx !== i))}>✕</button>
+                              onClick={() => setRows((p) => p.filter((_, idx) => idx !== i))}>
+                              <X size={13} />
+                            </button>
                           )}
                         </div>
                         <div className="suggest-row-fields">
                           <select value={row.course} onChange={(e) => updateRow(i, "course", e.target.value)} required>
                             <option value="">— Course —</option>
-                            {COURSES.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.title}</option>)}
+                            {COURSES.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
                           </select>
                           <select value={row.topic_id} onChange={(e) => updateRow(i, "topic_id", e.target.value)} required disabled={!row.course}>
                             <option value="">— Subtopic —</option>
@@ -182,8 +189,8 @@ export default function UserProfile() {
                           <input placeholder="URL (https://...)" value={row.url}
                             onChange={(e) => updateRow(i, "url", e.target.value)} required />
                           <select value={row.resource_type} onChange={(e) => updateRow(i, "resource_type", e.target.value)}>
-                            <option value="video">📹 Video</option>
-                            <option value="article">📄 Article</option>
+                            <option value="video">Video</option>
+                            <option value="article">Article</option>
                           </select>
                         </div>
                         {result && !result.ok && <p className="error-msg" style={{ marginTop: 6 }}>{result.msg}</p>}
@@ -193,7 +200,8 @@ export default function UserProfile() {
                 </div>
                 <div className="suggest-actions">
                   <button type="button" className="add-row-btn" onClick={() => setRows((p) => [...p, EMPTY_ROW()])}>
-                    + Add another
+                    <Plus size={14} style={{ display: "inline", marginRight: 4 }} />
+                    Add another
                   </button>
                   <button type="submit" className="btn btn-primary" disabled={submitting}>
                     {submitting ? "Submitting…" : `Submit ${rows.length > 1 ? `${rows.length} Resources` : "Resource"}`}
@@ -210,25 +218,35 @@ export default function UserProfile() {
               ) : (
                 <>
                   <div className="submission-stats">
-                    <span style={{ color: STATUS_COLOR.pending }}>⏳ {pending.length} pending</span>
-                    <span style={{ color: STATUS_COLOR.approved }}>✅ {approved.length} approved</span>
-                    <span style={{ color: STATUS_COLOR.rejected }}>❌ {rejected.length} rejected</span>
+                    <span style={{ color: STATUS_COLOR.pending, display: "flex", alignItems: "center", gap: 4 }}>
+                      <Clock size={14} /> {pending.length} pending
+                    </span>
+                    <span style={{ color: STATUS_COLOR.approved, display: "flex", alignItems: "center", gap: 4 }}>
+                      <CheckCircle size={14} /> {approved.length} approved
+                    </span>
+                    <span style={{ color: STATUS_COLOR.rejected, display: "flex", alignItems: "center", gap: 4 }}>
+                      <XCircle size={14} /> {rejected.length} rejected
+                    </span>
                   </div>
                   <div className="submission-list" style={{ marginTop: 12 }}>
-                    {submissions.map((s, i) => (
-                      <motion.div key={s.id} className="submission-item"
-                        initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.03 }}
-                      >
-                        <div className="submission-body">
-                          <a href={s.url} target="_blank" rel="noreferrer" className="resource-link">{s.title}</a>
-                          <span className="muted" style={{ fontSize: "0.8rem" }}> — {s.topic.replace(/^[^:]+: /, "")}</span>
-                        </div>
-                        <span className="submission-status" style={{ color: STATUS_COLOR[s.status] }}>
-                          {STATUS_LABEL[s.status]}
-                        </span>
-                      </motion.div>
-                    ))}
+                    {submissions.map((s, i) => {
+                      const SIcon = STATUS_ICON[s.status] || Clock;
+                      return (
+                        <motion.div key={s.id} className="submission-item"
+                          initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.03 }}
+                        >
+                          <div className="submission-body">
+                            <a href={s.url} target="_blank" rel="noreferrer" className="resource-link">{s.title}</a>
+                            <span className="muted" style={{ fontSize: "0.8rem" }}> — {s.topic.replace(/^[^:]+: /, "")}</span>
+                          </div>
+                          <span className="submission-status" style={{ color: STATUS_COLOR[s.status], display: "flex", alignItems: "center", gap: 4 }}>
+                            <SIcon size={14} />
+                            {STATUS_LABEL[s.status]}
+                          </span>
+                        </motion.div>
+                      );
+                    })}
                   </div>
                 </>
               )}
@@ -239,7 +257,10 @@ export default function UserProfile() {
         {tab === "settings" && (
           <motion.div key="settings" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
             <section style={{ marginBottom: 32 }}>
-              <h3 className="section-title">🔐 Change Password</h3>
+              <h3 className="section-title">
+                <Lock size={15} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
+                Change Password
+              </h3>
               <form className="pw-form" onSubmit={changePassword}>
                 <input type="password" placeholder="Current password"
                   value={pwForm.current_password}
@@ -251,17 +272,20 @@ export default function UserProfile() {
                   value={pwForm.confirm}
                   onChange={(e) => setPwForm({ ...pwForm, confirm: e.target.value })} required />
                 {pwErr && <p className="error-msg">{pwErr}</p>}
-                {pwMsg && <p className="success-msg">{pwMsg}</p>}
+                {pwMsg && <p className="success-msg" style={{ display: "flex", alignItems: "center", gap: 5 }}><CheckCircle size={14} /> {pwMsg}</p>}
                 <button type="submit" className="btn btn-primary">Update Password</button>
               </form>
             </section>
 
             <section style={{ marginBottom: 32 }}>
-              <h3 className="section-title">🎨 Appearance</h3>
+              <h3 className="section-title">
+                <Palette size={15} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
+                Appearance
+              </h3>
               <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                 <span>Dark mode</span>
                 <button className={`toggle-btn ${darkMode ? "active" : ""}`} onClick={() => setDarkMode(!darkMode)}>
-                  {darkMode ? "☀️ Light mode" : "🌙 Dark mode"}
+                  {darkMode ? "Light mode" : "Dark mode"}
                 </button>
               </div>
             </section>

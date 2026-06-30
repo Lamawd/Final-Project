@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { Target } from "lucide-react";
 import api from "../api/client";
 
 export default function Onboarding() {
@@ -26,7 +28,13 @@ export default function Onboarding() {
     <div className="onboarding-page">
       <div className="onboarding-card">
         <div className="onboarding-header">
-          <div className="onboarding-icon">🎯</div>
+          <motion.div
+            className="onboarding-icon"
+            animate={{ rotate: [0, -8, 8, -8, 0] }}
+            transition={{ duration: 1.2, delay: 0.3, repeat: Infinity, repeatDelay: 4 }}
+          >
+            <Target size={36} color="#4f46e5" strokeWidth={1.8} />
+          </motion.div>
           <h2>Let's personalise your path</h2>
           <p className="muted">Answer a few quick questions so we can tailor your recommendations.</p>
         </div>

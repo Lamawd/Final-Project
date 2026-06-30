@@ -1,8 +1,13 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  Play, FileText, ChevronDown, ChevronRight, ExternalLink,
+  Check, Star, Sparkles, Plus, ChevronUp, AlertTriangle,
+} from "lucide-react";
 import api from "../api/client";
 import { COURSES, courseOf } from "../courses";
+import CourseIcon from "../components/CourseIcon";
 
 function ytId(url) {
   try {
@@ -24,8 +29,8 @@ export default function TopicDetail() {
   const [topic, setTopic]               = useState(null);
   const [resources, setResources]       = useState([]);
   const [recs, setRecs]                 = useState([]);
-  const [stars, setStars]               = useState({});       // user's own rating
-  const [overallRating, setOverallRating] = useState({});      // {id: {avg, count}}
+  const [stars, setStars]               = useState({});
+  const [overallRating, setOverallRating] = useState({});
   const [resourceDone, setResourceDone] = useState({});
   const [topicCompleted, setTopicCompleted] = useState(false);
   const [allDone, setAllDone]           = useState(false);
@@ -38,7 +43,6 @@ export default function TopicDetail() {
 
   const course = topic ? COURSES.find((c) => c.id === courseOf(topic)) : null;
 
-  // Fetch topic data
   useEffect(() => {
     api.get(`/topics/${id}`).then((r) => setTopic(r.data));
     api.get(`/resources/topic/${id}`).then((r) => {
@@ -54,27 +58,22 @@ export default function TopicDetail() {
     }).catch(() => {});
   }, [id]);
 
-  // Track active time on this topic page (while tab is visible)
   const pageStart = useRef(null);
   const pageTime  = useRef(0);
 
   useEffect(() => {
     if (resources.length === 0) return;
-
     pageStart.current = Date.now();
-
     const pause  = () => { if (pageStart.current) { pageTime.current += Date.now() - pageStart.current; pageStart.current = null; } };
     const resume = () => { if (!pageStart.current) pageStart.current = Date.now(); };
     const flush  = () => {
       pause();
       const secs = Math.round(pageTime.current / 1000);
       if (secs > 0) {
-        // Send time against first resource as a proxy for the topic session
         const rid = resources[0]?.id;
         if (rid) api.post(`/resources/${rid}/engage`, { watch_completion: 0, revisit_count: 0, completed: !!resourceDone[rid], time_spent: secs });
       }
     };
-
     document.addEventListener("visibilitychange", () => document.hidden ? pause() : resume());
     window.addEventListener("beforeunload", flush);
     return () => { flush(); window.removeEventListener("beforeunload", flush); };
@@ -86,8 +85,8 @@ export default function TopicDetail() {
     }
   }, [resourceDone, resources]);
 
-  const stopTimer = (rid) => {};
-  const getTime = (rid) => 0;
+  const stopTimer = (_rid) => {};
+  const getTime   = (_rid) => 0;
 
   const markResourceDone = async (resource) => {
     const next = !resourceDone[resource.id];
@@ -124,7 +123,7 @@ export default function TopicDetail() {
     }
     try {
       await api.post("/resources/", { ...suggest, topic_id: topicId });
-      setSuggestMsg("✅ Submitted! An admin will review it shortly.");
+      setSuggestMsg("Submitted! An admin will review it shortly.");
       setSuggest({ title: "", url: "", resource_type: "video" });
       setShowSuggest(false);
     } catch (err) {
@@ -156,7 +155,8 @@ export default function TopicDetail() {
         <div>
           {course && (
             <span className="breadcrumb" onClick={() => navigate(`/courses/${course.id}`)}>
-              {course.icon} {course.title}
+              <CourseIcon icon={course.icon} color={course.color} size={16} />
+              <span style={{ marginLeft: 5 }}>{course.title}</span>
             </span>
           )}
           <h2>{topic.title.replace(/^[^:]+: /, "")}</h2>
@@ -168,7 +168,9 @@ export default function TopicDetail() {
           onClick={markTopicComplete}
           style={!topicCompleted ? { background: course?.color } : {}}
         >
-          {topicCompleted ? "✓ Completed" : "Mark Complete"}
+          {topicCompleted
+            ? <><Check size={15} style={{ display: "inline", marginRight: 4 }} />Completed</>
+            : "Mark Complete"}
         </motion.button>
       </motion.div>
 
@@ -180,14 +182,18 @@ export default function TopicDetail() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
           >
-            🎉 You've finished all resources! Mark this topic as complete.
+            <Sparkles size={16} style={{ display: "inline", marginRight: 6 }} />
+            You've finished all resources! Mark this topic as complete.
           </motion.div>
         )}
       </AnimatePresence>
 
       {videos.length > 0 && (
         <section style={{ marginBottom: 32 }}>
-          <h3 className="section-title">📹 Videos</h3>
+          <h3 className="section-title">
+            <Play size={16} className="section-title-icon" fill="currentColor" />
+            Videos
+          </h3>
           <div className="resource-cards">
             {videos.map((r, i) => {
               const vid = ytId(r.url);
@@ -206,15 +212,24 @@ export default function TopicDetail() {
                       className="resource-link-btn"
                       onClick={() => vid ? setActiveVideo(expanded ? null : r.id) : window.open(r.url, "_blank")}
                     >
-                      {vid ? (expanded ? "▼ " : "▶ ") : ""}{r.title}
+                      {vid
+                        ? expanded
+                          ? <ChevronDown size={14} style={{ display: "inline", marginRight: 4 }} />
+                          : <ChevronRight size={14} style={{ display: "inline", marginRight: 4 }} />
+                        : null}
+                      {r.title}
                     </button>
-                    <a href={r.url} target="_blank" rel="noreferrer" className="ext-link" title="Open in YouTube">↗</a>
+                    <a href={r.url} target="_blank" rel="noreferrer" className="ext-link" title="Open in YouTube">
+                      <ExternalLink size={14} />
+                    </a>
                     <motion.button
                       whileTap={{ scale: 0.9 }}
                       className={`done-btn ${resourceDone[r.id] ? "done-active" : ""}`}
                       onClick={() => markResourceDone(r)}
                     >
-                      {resourceDone[r.id] ? "✓ Done" : "Mark Done"}
+                      {resourceDone[r.id]
+                        ? <><Check size={13} style={{ display: "inline", marginRight: 3 }} />Done</>
+                        : "Mark Done"}
                     </motion.button>
                   </div>
 
@@ -260,7 +275,10 @@ export default function TopicDetail() {
 
       {articles.length > 0 && (
         <section style={{ marginBottom: 32 }}>
-          <h3 className="section-title">📄 Articles</h3>
+          <h3 className="section-title">
+            <FileText size={16} className="section-title-icon" />
+            Articles
+          </h3>
           <div className="resource-cards">
             {articles.map((r, i) => (
               <motion.div
@@ -280,7 +298,9 @@ export default function TopicDetail() {
                     className={`done-btn ${resourceDone[r.id] ? "done-active" : ""}`}
                     onClick={() => markResourceDone(r)}
                   >
-                    {resourceDone[r.id] ? "✓ Done" : "Mark Done"}
+                    {resourceDone[r.id]
+                      ? <><Check size={13} style={{ display: "inline", marginRight: 3 }} />Done</>
+                      : "Mark Done"}
                   </motion.button>
                 </div>
                 <div className="stars">
@@ -309,7 +329,10 @@ export default function TopicDetail() {
 
       {recs.length > 0 && (
         <section style={{ marginBottom: 32 }}>
-          <h3 className="section-title">✨ Suggested for You</h3>
+          <h3 className="section-title">
+            <Sparkles size={16} className="section-title-icon" />
+            Suggested for You
+          </h3>
           <div className="resource-cards">
             {recs.map((r, i) => (
               <motion.div
@@ -323,7 +346,10 @@ export default function TopicDetail() {
                   <a href={r.url} target="_blank" rel="noreferrer" className="resource-link">
                     {r.title}
                   </a>
-                  <span className="rec-score">⭐ {Number(r.score).toFixed(2)}</span>
+                  <span className="rec-score">
+                    <Star size={12} fill="currentColor" style={{ verticalAlign: "middle", marginRight: 2 }} />
+                    {Number(r.score).toFixed(2)}
+                  </span>
                 </div>
               </motion.div>
             ))}
@@ -336,9 +362,15 @@ export default function TopicDetail() {
           className="suggest-toggle"
           onClick={() => { setShowSuggest(!showSuggest); setSuggestMsg(""); setSuggestErr(""); }}
         >
-          {showSuggest ? "▲ Cancel" : "+ Suggest a Resource"}
+          {showSuggest
+            ? <><ChevronUp size={14} style={{ display: "inline", marginRight: 4 }} />Cancel</>
+            : <><Plus size={14} style={{ display: "inline", marginRight: 4 }} />Suggest a Resource</>}
         </button>
-        {suggestMsg && <p className="success-msg" style={{ marginTop: 10 }}>{suggestMsg}</p>}
+        {suggestMsg && (
+          <p className="success-msg" style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 6 }}>
+            <Check size={14} /> {suggestMsg}
+          </p>
+        )}
         <AnimatePresence>
           {showSuggest && (
             <motion.form
@@ -399,7 +431,10 @@ function LowRatingModal({ stars, onSubmit, onSkip }) {
         className="modal-box"
         initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.88, opacity: 0 }}
       >
-        <h3>{"⭐".repeat(stars)} Low rating</h3>
+        <h3 style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <AlertTriangle size={18} color="#f59e0b" />
+          Low rating ({stars} {stars === 1 ? "star" : "stars"})
+        </h3>
         <p style={{ margin: "10px 0" }}>Mind telling us why? <span className="muted">(optional)</span></p>
         <textarea
           className="reason-input"

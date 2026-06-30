@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Clock, CheckCircle, XCircle, Play, FileText, Users, ClipboardList } from "lucide-react";
 import api from "../api/client";
 
 const TYPE_COLOR = { video: "#6366f1", article: "#10b981" };
@@ -34,9 +35,9 @@ export default function AdminReview() {
   };
 
   const tabs = [
-    { key: "pending", label: `⏳ Pending (${pending.length})` },
-    { key: "all",     label: `📋 All Submissions (${all.length})` },
-    { key: "users",   label: `👥 Users (${users.length})` },
+    { key: "pending", Icon: Clock,          label: `Pending (${pending.length})` },
+    { key: "all",     Icon: ClipboardList,  label: `All Submissions (${all.length})` },
+    { key: "users",   Icon: Users,          label: `Users (${users.length})` },
   ];
 
   return (
@@ -49,15 +50,19 @@ export default function AdminReview() {
       <div className="profile-tabs" style={{ marginBottom: 28 }}>
         {tabs.map((t) => (
           <button key={t.key} className={`profile-tab ${tab === t.key ? "active" : ""}`} onClick={() => setTab(t.key)}>
+            <t.Icon size={14} style={{ display: "inline", marginRight: 5, verticalAlign: "middle" }} />
             {t.label}
           </button>
         ))}
       </div>
 
-      {/* ── Pending tab ── */}
+      {/* Pending tab */}
       {tab === "pending" && (
         pending.length === 0 ? (
-          <div className="empty-state"><div className="empty-icon">✅</div><p>All caught up!</p></div>
+          <div className="empty-state">
+            <div className="empty-icon"><CheckCircle size={40} color="#10b981" /></div>
+            <p>All caught up!</p>
+          </div>
         ) : (
           <AnimatePresence>
             {pending.map((r, i) => (
@@ -67,7 +72,7 @@ export default function AdminReview() {
         )
       )}
 
-      {/* ── All submissions tab ── */}
+      {/* All submissions tab */}
       {tab === "all" && (
         <div className="submission-list">
           {all.map((r) => (
@@ -82,8 +87,9 @@ export default function AdminReview() {
                 </a>
               </div>
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-                <span className="review-type-badge" style={{ background: TYPE_COLOR[r.type] || "#94a3b8" }}>
-                  {r.type === "video" ? "📹" : "📄"} {r.type}
+                <span className="review-type-badge" style={{ background: TYPE_COLOR[r.type] || "#94a3b8", display: "flex", alignItems: "center", gap: 4 }}>
+                  {r.type === "video" ? <Play size={11} fill="currentColor" /> : <FileText size={11} />}
+                  {r.type}
                 </span>
                 <span style={{ fontSize: "0.78rem", fontWeight: 600, color: STATUS_COLOR[r.status] }}>
                   {r.status}
@@ -94,7 +100,7 @@ export default function AdminReview() {
         </div>
       )}
 
-      {/* ── Users tab ── */}
+      {/* Users tab */}
       {tab === "users" && (
         <div className="submission-list">
           {users.map((u) => (
@@ -134,8 +140,9 @@ function ResourceCard({ r, i, reviewed, onReview }) {
           <span className="review-course">{r.course}</span>
           <span className="review-arrow">›</span>
           <span className="review-topic">{r.topic}</span>
-          <span className="review-type-badge" style={{ background: TYPE_COLOR[r.type] || "#94a3b8" }}>
-            {r.type === "video" ? "📹" : "📄"} {r.type}
+          <span className="review-type-badge" style={{ background: TYPE_COLOR[r.type] || "#94a3b8", display: "inline-flex", alignItems: "center", gap: 4 }}>
+            {r.type === "video" ? <Play size={11} fill="currentColor" /> : <FileText size={11} />}
+            {r.type}
           </span>
         </div>
         <span className="review-date">{r.submitted} by <strong>{r.uploader}</strong></span>
@@ -147,8 +154,12 @@ function ResourceCard({ r, i, reviewed, onReview }) {
         </a>
       </div>
       <div className="review-actions">
-        <button className="btn btn-approve" onClick={() => onReview(r.id, true)} disabled={!!reviewed}>✓ Approve</button>
-        <button className="btn btn-reject"  onClick={() => onReview(r.id, false)} disabled={!!reviewed}>✕ Reject</button>
+        <button className="btn btn-approve" onClick={() => onReview(r.id, true)} disabled={!!reviewed}>
+          <CheckCircle size={14} style={{ display: "inline", marginRight: 4 }} />Approve
+        </button>
+        <button className="btn btn-reject"  onClick={() => onReview(r.id, false)} disabled={!!reviewed}>
+          <XCircle size={14} style={{ display: "inline", marginRight: 4 }} />Reject
+        </button>
       </div>
     </motion.div>
   );
