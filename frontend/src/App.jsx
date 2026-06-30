@@ -8,7 +8,6 @@ import CourseDetail from "./pages/CourseDetail";
 import TopicDetail from "./pages/TopicDetail";
 import AdminReview from "./pages/AdminReview";
 import Onboarding from "./pages/Onboarding";
-import SuggestPage from "./pages/SuggestPage";
 import Progress from "./pages/Progress";
 import UserProfile from "./pages/UserProfile";
 import Courses from "./pages/Courses";
@@ -50,7 +49,7 @@ function Layout() {
         <Route path="/topics" element={<Protected><Topics /></Protected>} />
         <Route path="/courses/:courseId" element={<Protected><CourseDetail /></Protected>} />
         <Route path="/topics/:id" element={<Protected><TopicDetail /></Protected>} />
-        <Route path="/suggest" element={<Protected><SuggestPage /></Protected>} />
+        <Route path="/suggest" element={<Navigate to="/profile" replace />} />
         <Route path="/progress" element={<Protected><Progress /></Protected>} />
         <Route path="/profile" element={<Protected><UserProfile /></Protected>} />
         <Route path="/admin" element={<AdminOnly><AdminReview /></AdminOnly>} />

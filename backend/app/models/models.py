@@ -108,6 +108,7 @@ class Engagement(Base):
         Index("ix_engagement_user_completed", "user_id", "completed"),
     )
 
+    user = relationship("User")
     resource = relationship("Resource", back_populates="engagements")
 
 

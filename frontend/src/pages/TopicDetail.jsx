@@ -330,25 +330,12 @@ export default function TopicDetail() {
                     )}
                   </AnimatePresence>
 
-                  <div className="stars">
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <span
-                        key={s}
-                        className={(stars[r.id] || 0) >= s ? "star on" : "star"}
-                        onClick={() => handleStarClick(r.id, s)}
-                      >★</span>
-                    ))}
-                    {overallRating[r.id]?.count > 0 && (
-                      <span className="overall-rating">
-                        {overallRating[r.id].avg}★ ({overallRating[r.id].count} {overallRating[r.id].count === 1 ? "review" : "reviews"})
-                      </span>
-                    )}
-                  </div>
                   <ResourceActions r={r} stars={stars} overallRating={overallRating}
                     handleStarClick={handleStarClick} reviewData={reviewData}
                     toggleReviews={toggleReviews} toggleComments={toggleComments}
                     submitComment={submitComment} deleteComment={deleteComment}
                     setReviewData={setReviewData} user={user} />
+                </motion.div>
               );
             })}
           </div>

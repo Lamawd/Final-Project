@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import {
   Map, Target, BarChart2, Users,
   Play, FileText, Star, Film, ArrowRight, BookOpen,
-  MessageSquare, Rocket,
+  MessageSquare, Rocket, Sparkles,
 } from "lucide-react";
 import api from "../api/client";
 import { COURSES, courseOf } from "../courses";
@@ -36,6 +36,7 @@ export default function Home() {
   const [progress, setProgress]             = useState({});
   const [topicsByCourse, setTopicsByCourse] = useState({});
   const [feed, setFeed]                     = useState(null);
+  const [hasOnboarding, setHasOnboarding]   = useState(true); // assume true until we know
 
   useEffect(() => {
     api.get("/topics/").then((r) => {
@@ -48,7 +49,11 @@ export default function Home() {
       r.data.forEach((p) => { map[p.topic_id] = p.completed; });
       setProgress(map);
     }).catch(() => {});
-    api.get("/recommend/home").then((r) => setFeed(r.data)).catch(() => {});
+    api.get("/recommend/home").then((r) => {
+      setFeed(r.data);
+      // If picks are empty, prompt the user to do onboarding
+      if (!r.data?.picks?.length) setHasOnboarding(false);
+    }).catch(() => { setHasOnboarding(false); });
   }, []);
 
   const inProgress = COURSES.filter((c) => {
@@ -79,6 +84,25 @@ export default function Home() {
           Browse Courses <ArrowRight size={16} />
         </Link>
       </motion.div>
+
+      {/* Onboarding CTA — shown when user has no personalisation data yet */}
+      {!hasOnboarding && (
+        <motion.div
+          className="all-done-banner"
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 24 }}
+        >
+          <span>
+            <Sparkles size={15} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
+            <strong>Personalise your feed</strong> — answer a few quick questions to get tailored recommendations.
+          </span>
+          <Link to="/onboarding" className="btn btn-primary" style={{ fontSize: "0.85rem", padding: "6px 14px" }}>
+            Start Quiz →
+          </Link>
+        </motion.div>
+      )}
 
       {/* Continue learning strip */}
       {inProgress.length > 0 && (
