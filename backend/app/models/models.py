@@ -17,12 +17,14 @@ class User(Base):
     email = Column(String, unique=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     is_admin = Column(Boolean, default=False)
+    avatar_url = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     ratings = relationship("Rating", back_populates="user")
     progress = relationship("UserProgress", back_populates="user")
     uploads = relationship("Resource", back_populates="uploader")
     quiz_answers = relationship("OnboardingAnswer", back_populates="user")
+    comments = relationship("Comment", back_populates="user")
 
 
 class Topic(Base):
@@ -62,7 +64,7 @@ class Resource(Base):
     uploader_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     title = Column(String, nullable=False)
     url = Column(String, nullable=False)
-    resource_type = Column(String)
+    resource_type = Column(String)   # video, article, pdf, doc, other
     status = Column(Enum(ResourceStatus), default=ResourceStatus.pending)
     version = Column(Integer, default=1)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -76,6 +78,7 @@ class Resource(Base):
     uploader = relationship("User", back_populates="uploads")
     ratings = relationship("Rating", back_populates="resource")
     engagements = relationship("Engagement", back_populates="resource")
+    comments = relationship("Comment", back_populates="resource", cascade="all, delete-orphan")
 
 
 class Rating(Base):
@@ -145,3 +148,34 @@ class OnboardingAnswer(Base):
 
     user = relationship("User", back_populates="quiz_answers")
     question = relationship("OnboardingQuestion", back_populates="answers")
+
+
+class Comment(Base):
+    __tablename__ = "comments"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    resource_id = Column(Integer, ForeignKey("resources.id"), nullable=False)
+    body = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="comments")
+    resource = relationship("Resource", back_populates="comments")
+
+
+class CourseRequestStatus(str, enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+
+
+class CourseRequest(Base):
+    __tablename__ = "course_requests"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(Enum(CourseRequestStatus), default=CourseRequestStatus.pending)
+    admin_note = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")

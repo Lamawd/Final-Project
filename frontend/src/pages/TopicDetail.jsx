@@ -4,10 +4,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Play, FileText, ChevronDown, ChevronRight, ExternalLink,
   Check, Star, Sparkles, Plus, ChevronUp, AlertTriangle,
+  MessageSquare, Trash2, FileType,
 } from "lucide-react";
 import api from "../api/client";
 import { COURSES, courseOf } from "../courses";
 import CourseIcon from "../components/CourseIcon";
+import { useAuth } from "../context/AuthContext";
 
 function ytId(url) {
   try {
@@ -25,6 +27,7 @@ export default function TopicDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const topicId = parseInt(id);
+  const { user } = useAuth();
 
   const [topic, setTopic]               = useState(null);
   const [resources, setResources]       = useState([]);
@@ -40,9 +43,64 @@ export default function TopicDetail() {
   const [suggestMsg, setSuggestMsg]     = useState("");
   const [suggestErr, setSuggestErr]     = useState("");
   const [ratingModal, setRatingModal]   = useState(null);
-  const [quizModal, setQuizModal]       = useState(null);   // {questions, pendingComplete}
+  const [quizModal, setQuizModal]       = useState(null);
+
+  // Reviews & comments: { [resource_id]: { reviews: [], comments: [], showReviews: false, showComments: false, newComment: "" } }
+  const [reviewData, setReviewData]     = useState({});
 
   const course = topic ? COURSES.find((c) => c.id === courseOf(topic)) : null;
+
+  const initReviewData = (resId) => {
+    setReviewData((prev) => prev[resId] ? prev : {
+      ...prev,
+      [resId]: { reviews: [], comments: [], showReviews: false, showComments: false, newComment: "", submitting: false }
+    });
+  };
+
+  const toggleReviews = async (resId) => {
+    initReviewData(resId);
+    const current = reviewData[resId];
+    if (!current?.showReviews && (!current?.reviews?.length)) {
+      const res = await api.get(`/resources/${resId}/reviews`).catch(() => ({ data: [] }));
+      setReviewData((prev) => ({ ...prev, [resId]: { ...prev[resId], reviews: res.data, showReviews: true } }));
+    } else {
+      setReviewData((prev) => ({ ...prev, [resId]: { ...prev[resId], showReviews: !prev[resId].showReviews } }));
+    }
+  };
+
+  const toggleComments = async (resId) => {
+    initReviewData(resId);
+    const current = reviewData[resId];
+    if (!current?.showComments && (!current?.comments?.length)) {
+      const res = await api.get(`/resources/${resId}/comments`).catch(() => ({ data: [] }));
+      setReviewData((prev) => ({ ...prev, [resId]: { ...prev[resId], comments: res.data, showComments: true } }));
+    } else {
+      setReviewData((prev) => ({ ...prev, [resId]: { ...prev[resId], showComments: !prev[resId].showComments } }));
+    }
+  };
+
+  const submitComment = async (resId) => {
+    const body = reviewData[resId]?.newComment?.trim();
+    if (!body) return;
+    setReviewData((prev) => ({ ...prev, [resId]: { ...prev[resId], submitting: true } }));
+    try {
+      const res = await api.post(`/resources/${resId}/comments`, { body });
+      setReviewData((prev) => ({
+        ...prev,
+        [resId]: { ...prev[resId], comments: [res.data, ...(prev[resId].comments || [])], newComment: "", submitting: false }
+      }));
+    } catch {
+      setReviewData((prev) => ({ ...prev, [resId]: { ...prev[resId], submitting: false } }));
+    }
+  };
+
+  const deleteComment = async (resId, commentId) => {
+    await api.delete(`/resources/${resId}/comments/${commentId}`).catch(() => {});
+    setReviewData((prev) => ({
+      ...prev,
+      [resId]: { ...prev[resId], comments: prev[resId].comments.filter((c) => c.id !== commentId) }
+    }));
+  };
 
   useEffect(() => {
     api.get(`/topics/${id}`).then((r) => setTopic(r.data));
@@ -286,7 +344,11 @@ export default function TopicDetail() {
                       </span>
                     )}
                   </div>
-                </motion.div>
+                  <ResourceActions r={r} stars={stars} overallRating={overallRating}
+                    handleStarClick={handleStarClick} reviewData={reviewData}
+                    toggleReviews={toggleReviews} toggleComments={toggleComments}
+                    submitComment={submitComment} deleteComment={deleteComment}
+                    setReviewData={setReviewData} user={user} />
               );
             })}
           </div>
@@ -323,21 +385,11 @@ export default function TopicDetail() {
                       : "Mark Done"}
                   </motion.button>
                 </div>
-                <div className="stars">
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <span
-                      key={s}
-                      className={(stars[r.id] || 0) >= s ? "star on" : "star"}
-                      onClick={() => handleStarClick(r.id, s)}
-                    >★</span>
-                  ))}
-                  {overallRating[r.id]?.count > 0 && (
-                    <span className="overall-rating">
-                      {overallRating[r.id].avg}★ ({overallRating[r.id].count} {overallRating[r.id].count === 1 ? "review" : "reviews"})
-                    </span>
-                  )}
-                </div>
-              </motion.div>
+                <ResourceActions r={r} stars={stars} overallRating={overallRating}
+                  handleStarClick={handleStarClick} reviewData={reviewData}
+                  toggleReviews={toggleReviews} toggleComments={toggleComments}
+                  submitComment={submitComment} deleteComment={deleteComment}
+                  setReviewData={setReviewData} user={user} />
             ))}
           </div>
         </section>
@@ -419,6 +471,9 @@ export default function TopicDetail() {
               >
                 <option value="video">Video</option>
                 <option value="article">Article</option>
+                <option value="pdf">PDF</option>
+                <option value="doc">Document (Word/Doc)</option>
+                <option value="other">Other</option>
               </select>
               {suggestErr && <p className="error-msg">{suggestErr}</p>}
               <button type="submit" className="btn btn-primary">Submit for Review</button>
@@ -445,6 +500,102 @@ export default function TopicDetail() {
             onFinish={finishQuiz}
             onSkip={finishQuiz}
           />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function ResourceActions({ r, stars, overallRating, handleStarClick, reviewData, toggleReviews,
+  toggleComments, submitComment, deleteComment, setReviewData, user }) {
+  const rd = reviewData[r.id] || {};
+  return (
+    <div>
+      <div className="stars" style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 4 }}>
+        {[1, 2, 3, 4, 5].map((s) => (
+          <span key={s} className={(stars[r.id] || 0) >= s ? "star on" : "star"}
+            onClick={() => handleStarClick(r.id, s)}>★</span>
+        ))}
+        {overallRating[r.id]?.count > 0 && (
+          <button className="btn" style={{ fontSize: 12, padding: "2px 8px", marginLeft: 4 }}
+            onClick={() => toggleReviews(r.id)}>
+            {overallRating[r.id].avg}★ ({overallRating[r.id].count}) — see reviews
+          </button>
+        )}
+        <button className="btn" style={{ fontSize: 12, padding: "2px 8px", display: "flex", alignItems: "center", gap: 3 }}
+          onClick={() => toggleComments(r.id)}>
+          <MessageSquare size={12} />
+          {r.comment_count > 0 ? `${r.comment_count} comment${r.comment_count !== 1 ? "s" : ""}` : "Comment"}
+        </button>
+      </div>
+
+      {/* Reviews panel */}
+      <AnimatePresence>
+        {rd.showReviews && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }} style={{ overflow: "hidden" }}>
+            <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+              {rd.reviews?.length === 0 && <p className="muted" style={{ fontSize: 13 }}>No reviews yet.</p>}
+              {rd.reviews?.map((rv) => (
+                <div key={rv.user_id} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "6px 0", borderBottom: "1px solid #f3f4f6" }}>
+                  {rv.avatar_url
+                    ? <img src={rv.avatar_url} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }} />
+                    : <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#e5e7eb", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#6b7280" }}>{rv.username?.[0]?.toUpperCase()}</div>
+                  }
+                  <div>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{rv.username}</span>
+                    <span style={{ marginLeft: 6, color: "#f59e0b", fontSize: 13 }}>{"★".repeat(rv.stars)}{"☆".repeat(5 - rv.stars)}</span>
+                    {rv.reason && <p style={{ margin: "2px 0 0", fontSize: 13, color: "#6b7280" }}>{rv.reason}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Comments panel */}
+      <AnimatePresence>
+        {rd.showComments && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }} style={{ overflow: "hidden" }}>
+            <div style={{ marginTop: 8 }}>
+              {/* Comment input */}
+              <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+                <input
+                  placeholder="Write a comment…"
+                  value={rd.newComment || ""}
+                  onChange={(e) => setReviewData((prev) => ({ ...prev, [r.id]: { ...prev[r.id], newComment: e.target.value } }))}
+                  onKeyDown={(e) => e.key === "Enter" && submitComment(r.id)}
+                  style={{ flex: 1, padding: "6px 10px", borderRadius: 6, border: "1px solid #d1d5db", fontSize: 13 }}
+                />
+                <button className="btn btn-primary" style={{ fontSize: 12, padding: "4px 12px" }}
+                  disabled={rd.submitting || !rd.newComment?.trim()}
+                  onClick={() => submitComment(r.id)}>
+                  Post
+                </button>
+              </div>
+              {rd.comments?.length === 0 && <p className="muted" style={{ fontSize: 13 }}>No comments yet. Be the first!</p>}
+              {rd.comments?.map((c) => (
+                <div key={c.id} style={{ display: "flex", gap: 8, alignItems: "flex-start", padding: "6px 0", borderBottom: "1px solid #f3f4f6" }}>
+                  {c.avatar_url
+                    ? <img src={c.avatar_url} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover" }} />
+                    : <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#e5e7eb", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#6b7280" }}>{c.username?.[0]?.toUpperCase()}</div>
+                  }
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{c.username}</span>
+                    <span style={{ fontSize: 11, color: "#9ca3af", marginLeft: 6 }}>{c.created_at}</span>
+                    <p style={{ margin: "2px 0 0", fontSize: 13 }}>{c.body}</p>
+                  </div>
+                  {(user?.id === c.user_id || user?.is_admin) && (
+                    <button onClick={() => deleteComment(r.id, c.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", padding: 2 }}>
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

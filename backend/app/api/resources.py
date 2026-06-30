@@ -5,7 +5,7 @@ from typing import Optional
 from urllib.parse import urlparse
 from app.core.database import get_db
 from app.core.security import get_current_user, require_admin
-from app.models.models import Resource, ResourceStatus, Rating, Engagement, User
+from app.models.models import Resource, ResourceStatus, Rating, Engagement, User, Comment, CourseRequest, CourseRequestStatus
 
 router = APIRouter(prefix="/resources", tags=["resources"])
 
@@ -14,7 +14,7 @@ class ResourceCreate(BaseModel):
     topic_id: int
     title: str
     url: str
-    resource_type: Optional[str] = "article"
+    resource_type: Optional[str] = "article"  # video, article, pdf, doc, other
 
     @field_validator("url")
     @classmethod
@@ -32,19 +32,44 @@ class ResourceCreate(BaseModel):
         v = v.strip()
         if not v:
             raise ValueError("Title cannot be empty")
-        return v[:200]  # cap length
+        return v[:200]
 
 
 class RatingCreate(BaseModel):
-    stars: int  # 1-5
-    reason: Optional[str] = None  # optional low-rating feedback
+    stars: int
+    reason: Optional[str] = None
+
+
+class CommentCreate(BaseModel):
+    body: str
+
+    @field_validator("body")
+    @classmethod
+    def validate_body(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Comment cannot be empty")
+        return v[:1000]
+
+
+class CourseRequestCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, v: str) -> str:
+        v = v.strip()
+        if len(v) < 3:
+            raise ValueError("Course title must be at least 3 characters")
+        return v[:200]
 
 
 class EngagementUpdate(BaseModel):
     watch_completion: float = 0.0
     revisit_count: int = 0
     completed: bool = False
-    time_spent: int = 0  # seconds
+    time_spent: int = 0
 
 
 @router.get("/topic/{topic_id}")
@@ -54,9 +79,107 @@ def get_by_topic(topic_id: int, db: Session = Depends(get_db)):
     for r in resources:
         stars = [rt.stars for rt in r.ratings]
         avg = round(sum(stars) / len(stars), 1) if stars else 0.0
-        result.append({"id": r.id, "title": r.title, "url": r.url, "type": r.resource_type,
-                        "avg_rating": avg, "rating_count": len(stars)})
+        result.append({
+            "id": r.id, "title": r.title, "url": r.url, "type": r.resource_type,
+            "avg_rating": avg, "rating_count": len(stars),
+            "comment_count": len(r.comments),
+        })
     return result
+
+
+@router.get("/{resource_id}/reviews")
+def get_reviews(resource_id: int, db: Session = Depends(get_db)):
+    """Return all ratings with their comments for a resource."""
+    ratings = db.query(Rating).filter_by(resource_id=resource_id).all()
+    result = []
+    for rt in ratings:
+        result.append({
+            "user_id": rt.user_id,
+            "username": rt.user.username if rt.user else "?",
+            "avatar_url": rt.user.avatar_url if rt.user else None,
+            "stars": rt.stars,
+            "reason": rt.reason,
+        })
+    return result
+
+
+@router.get("/{resource_id}/comments")
+def get_comments(resource_id: int, db: Session = Depends(get_db)):
+    comments = db.query(Comment).filter_by(resource_id=resource_id).order_by(Comment.created_at.desc()).all()
+    return [{
+        "id": c.id,
+        "user_id": c.user_id,
+        "username": c.user.username if c.user else "?",
+        "avatar_url": c.user.avatar_url if c.user else None,
+        "body": c.body,
+        "created_at": c.created_at.strftime("%b %d, %Y") if c.created_at else "",
+    } for c in comments]
+
+
+@router.post("/{resource_id}/comments", status_code=201)
+def add_comment(resource_id: int, data: CommentCreate,
+                current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    resource = db.query(Resource).filter_by(id=resource_id, status=ResourceStatus.approved).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    comment = Comment(user_id=current_user.id, resource_id=resource_id, body=data.body)
+    db.add(comment)
+    db.commit()
+    db.refresh(comment)
+    return {
+        "id": comment.id,
+        "user_id": comment.user_id,
+        "username": current_user.username,
+        "avatar_url": current_user.avatar_url,
+        "body": comment.body,
+        "created_at": comment.created_at.strftime("%b %d, %Y"),
+    }
+
+
+@router.delete("/{resource_id}/comments/{comment_id}")
+def delete_comment(resource_id: int, comment_id: int,
+                   current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    comment = db.query(Comment).filter_by(id=comment_id, resource_id=resource_id).first()
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    if comment.user_id != current_user.id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Not allowed")
+    db.delete(comment)
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/courses/suggest", status_code=201)
+def suggest_course(data: CourseRequestCreate,
+                   current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    req = CourseRequest(user_id=current_user.id, title=data.title, description=data.description)
+    db.add(req)
+    db.commit()
+    db.refresh(req)
+    return {"id": req.id, "title": req.title, "status": req.status}
+
+
+@router.get("/courses/suggestions", dependencies=[Depends(require_admin)])
+def list_course_suggestions(db: Session = Depends(get_db)):
+    reqs = db.query(CourseRequest).order_by(CourseRequest.created_at.desc()).all()
+    return [{
+        "id": r.id, "title": r.title, "description": r.description,
+        "status": r.status, "admin_note": r.admin_note,
+        "requested_by": r.user.username if r.user else "?",
+        "created_at": r.created_at.strftime("%b %d, %Y") if r.created_at else "",
+    } for r in reqs]
+
+
+@router.patch("/courses/suggestions/{req_id}", dependencies=[Depends(require_admin)])
+def review_course_suggestion(req_id: int, approved: bool, admin_note: Optional[str] = None,
+                              db: Session = Depends(get_db)):
+    req = db.query(CourseRequest).filter_by(id=req_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Not found")
+    req.status = CourseRequestStatus.approved if approved else CourseRequestStatus.rejected
+    req.admin_note = admin_note
+    db.commit()
+    return {"ok": True, "status": req.status}
 
 
 @router.post("/", status_code=201)

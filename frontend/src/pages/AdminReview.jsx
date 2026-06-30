@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, CheckCircle, XCircle, Play, FileText, Users, ClipboardList } from "lucide-react";
+import { Clock, CheckCircle, XCircle, Play, FileText, Users, ClipboardList, BookOpen } from "lucide-react";
 import api from "../api/client";
 
-const TYPE_COLOR = { video: "#6366f1", article: "#10b981" };
+const TYPE_COLOR = { video: "#6366f1", article: "#10b981", pdf: "#ef4444", doc: "#3b82f6", other: "#6b7280" };
 const STATUS_COLOR = { approved: "#059669", rejected: "#dc2626", pending: "#d97706" };
 
 export default function AdminReview() {
@@ -12,11 +12,14 @@ export default function AdminReview() {
   const [all, setAll]           = useState([]);
   const [users, setUsers]       = useState([]);
   const [reviewed, setReviewed] = useState({});
+  const [courseReqs, setCourseReqs] = useState([]);
+  const [courseReviewed, setCourseReviewed] = useState({});
 
   useEffect(() => {
     api.get("/resources/pending").then((r) => setPending(r.data));
     api.get("/resources/admin/all").then((r) => setAll(r.data));
     api.get("/auth/admin/users").then((r) => setUsers(r.data));
+    api.get("/resources/courses/suggestions").then((r) => setCourseReqs(r.data)).catch(() => {});
   }, []);
 
   const review = async (id, approved) => {
@@ -28,6 +31,12 @@ export default function AdminReview() {
     }, 500);
   };
 
+  const reviewCourse = async (id, approved) => {
+    await api.patch(`/resources/courses/suggestions/${id}`, null, { params: { approved } });
+    setCourseReviewed((prev) => ({ ...prev, [id]: approved ? "approved" : "rejected" }));
+    setCourseReqs((prev) => prev.map((r) => r.id === id ? { ...r, status: approved ? "approved" : "rejected" } : r));
+  };
+
   const deleteUser = async (id) => {
     if (!confirm("Delete this user? This cannot be undone.")) return;
     await api.delete(`/auth/admin/users/${id}`);
@@ -35,9 +44,10 @@ export default function AdminReview() {
   };
 
   const tabs = [
-    { key: "pending", Icon: Clock,          label: `Pending (${pending.length})` },
-    { key: "all",     Icon: ClipboardList,  label: `All Submissions (${all.length})` },
-    { key: "users",   Icon: Users,          label: `Users (${users.length})` },
+    { key: "pending",  Icon: Clock,         label: `Pending (${pending.length})` },
+    { key: "all",      Icon: ClipboardList, label: `All Submissions (${all.length})` },
+    { key: "users",    Icon: Users,         label: `Users (${users.length})` },
+    { key: "courses",  Icon: BookOpen,      label: `Course Suggestions (${courseReqs.filter(r => r.status === "pending").length})` },
   ];
 
   return (
@@ -121,6 +131,53 @@ export default function AdminReview() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Course suggestions tab */}
+      {tab === "courses" && (
+        courseReqs.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon"><BookOpen size={40} color="#6b7280" /></div>
+            <p>No course suggestions yet.</p>
+          </div>
+        ) : (
+          <div className="submission-list">
+            {courseReqs.map((cr) => (
+              <div key={cr.id} className="submission-item" style={{ alignItems: "flex-start", gap: 12 }}>
+                <div className="submission-body" style={{ flex: 1 }}>
+                  <strong style={{ fontSize: "0.95rem" }}>{cr.title}</strong>
+                  <span className="muted" style={{ fontSize: "0.8rem", display: "block", marginTop: 2 }}>
+                    by {cr.requested_by} · {cr.created_at}
+                  </span>
+                  {cr.description && <p style={{ fontSize: "0.85rem", color: "#374151", marginTop: 4 }}>{cr.description}</p>}
+                  {cr.admin_note && <p style={{ fontSize: "0.8rem", color: "#6b7280", marginTop: 4 }}>Note: {cr.admin_note}</p>}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                  <span style={{ fontSize: "0.78rem", fontWeight: 600, color: STATUS_COLOR[cr.status] || "#6b7280" }}>
+                    {cr.status}
+                  </span>
+                  {cr.status === "pending" && !courseReviewed[cr.id] && (
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button className="btn btn-approve" style={{ fontSize: "0.8rem", padding: "4px 10px" }}
+                        onClick={() => reviewCourse(cr.id, true)}>
+                        <CheckCircle size={13} style={{ display: "inline", marginRight: 3 }} />Approve
+                      </button>
+                      <button className="btn btn-reject" style={{ fontSize: "0.8rem", padding: "4px 10px" }}
+                        onClick={() => reviewCourse(cr.id, false)}>
+                        <XCircle size={13} style={{ display: "inline", marginRight: 3 }} />Reject
+                      </button>
+                    </div>
+                  )}
+                  {courseReviewed[cr.id] && (
+                    <span style={{ fontSize: "0.78rem", color: courseReviewed[cr.id] === "approved" ? "#10b981" : "#ef4444" }}>
+                      {courseReviewed[cr.id] === "approved" ? "✓ Approved" : "✗ Rejected"}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       )}
     </div>
   );

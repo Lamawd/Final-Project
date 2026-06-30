@@ -104,12 +104,47 @@ def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Ses
 
 @router.get("/me")
 def me(current_user: User = Depends(get_current_user)):
-    return {"id": current_user.id, "username": current_user.username, "email": current_user.email, "is_admin": current_user.is_admin}
+    return {"id": current_user.id, "username": current_user.username,
+            "email": current_user.email, "is_admin": current_user.is_admin,
+            "avatar_url": current_user.avatar_url}
 
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
+
+
+class UpdateProfileRequest(BaseModel):
+    username: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+
+@router.patch("/me")
+def update_profile(req: UpdateProfileRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if req.username is not None:
+        uname = req.username.strip()[:50]
+        if len(uname) < 2:
+            raise HTTPException(status_code=400, detail="Username must be at least 2 characters")
+        existing = db.query(User).filter(User.username == uname, User.id != current_user.id).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="This username is already taken")
+        current_user.username = uname
+    if req.avatar_url is not None:
+        if req.avatar_url == "":
+            current_user.avatar_url = None
+        else:
+            try:
+                from urllib.parse import urlparse
+                p = urlparse(req.avatar_url)
+                if p.scheme not in ("http", "https"):
+                    raise ValueError()
+            except Exception:
+                raise HTTPException(status_code=400, detail="Avatar must be a valid http/https URL")
+            current_user.avatar_url = req.avatar_url
+    db.commit()
+    return {"id": current_user.id, "username": current_user.username,
+            "email": current_user.email, "avatar_url": current_user.avatar_url,
+            "is_admin": current_user.is_admin}
 
 
 @router.post("/change-password")

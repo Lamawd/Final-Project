@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Clock, CheckCircle, XCircle, Inbox, Settings, Lock, Palette, Plus, X } from "lucide-react";
+import { Clock, CheckCircle, XCircle, Inbox, Settings, Lock, Palette, Plus, X, BookOpen, User } from "lucide-react";
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import { COURSES, courseOf } from "../courses";
@@ -11,7 +11,7 @@ const STATUS_LABEL = { approved: "Approved", pending: "Pending", rejected: "Reje
 const EMPTY_ROW = () => ({ course: "", topic_id: "", title: "", url: "", resource_type: "video" });
 
 export default function UserProfile() {
-  const { user, logout } = useAuth();
+  const { user, setUser, logout } = useAuth();
   const [tab, setTab] = useState("contributions");
 
   // Dark mode
@@ -26,6 +26,43 @@ export default function UserProfile() {
   const loadSubmissions = () =>
     api.get("/auth/me/submissions").then((r) => setSubmissions(r.data)).catch(() => {});
   useEffect(() => { loadSubmissions(); }, []);
+
+  // Edit profile
+  const [profileForm, setProfileForm] = useState({ username: user?.username || "", avatar_url: user?.avatar_url || "" });
+  const [profileMsg, setProfileMsg]   = useState("");
+  const [profileErr, setProfileErr]   = useState("");
+
+  const saveProfile = async (e) => {
+    e.preventDefault();
+    setProfileErr(""); setProfileMsg("");
+    try {
+      const res = await api.patch("/auth/me", {
+        username: profileForm.username.trim() || undefined,
+        avatar_url: profileForm.avatar_url.trim() || "",
+      });
+      setProfileMsg("Profile updated!");
+      if (setUser) setUser((prev) => ({ ...prev, username: res.data.username, avatar_url: res.data.avatar_url }));
+    } catch (err) {
+      setProfileErr(err.response?.data?.detail || "Failed to update profile");
+    }
+  };
+
+  // Course suggestion
+  const [courseReq, setCourseReq]   = useState({ title: "", description: "" });
+  const [courseMsg, setCourseMsg]   = useState("");
+  const [courseErr, setCourseErr]   = useState("");
+
+  const suggestCourse = async (e) => {
+    e.preventDefault();
+    setCourseErr(""); setCourseMsg("");
+    try {
+      await api.post("/resources/courses/suggest", courseReq);
+      setCourseMsg("Course suggestion submitted! An admin will review it.");
+      setCourseReq({ title: "", description: "" });
+    } catch (err) {
+      setCourseErr(err.response?.data?.detail || "Failed to submit");
+    }
+  };
 
   // Suggest rows
   const [allTopics, setAllTopics] = useState([]);
@@ -100,6 +137,7 @@ export default function UserProfile() {
   const approved = submissions.filter((s) => s.status === "approved");
   const rejected = submissions.filter((s) => s.status === "rejected");
   const successCount = results.filter((r) => r.ok).length;
+  const avatarUrl = user?.avatar_url;
 
   return (
     <div className="page">
@@ -110,7 +148,11 @@ export default function UserProfile() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        <div className="profile-avatar">{user?.username?.[0]?.toUpperCase()}</div>
+        <div className="profile-avatar">
+          {avatarUrl
+            ? <img src={avatarUrl} alt={user?.username} style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
+            : user?.username?.[0]?.toUpperCase()}
+        </div>
         <div>
           <h2>{user?.username}</h2>
           <p className="muted">{user?.email}</p>
@@ -191,6 +233,9 @@ export default function UserProfile() {
                           <select value={row.resource_type} onChange={(e) => updateRow(i, "resource_type", e.target.value)}>
                             <option value="video">Video</option>
                             <option value="article">Article</option>
+                            <option value="pdf">PDF</option>
+                            <option value="doc">Document</option>
+                            <option value="other">Other</option>
                           </select>
                         </div>
                         {result && !result.ok && <p className="error-msg" style={{ marginTop: 6 }}>{result.msg}</p>}
@@ -251,11 +296,63 @@ export default function UserProfile() {
                 </>
               )}
             </section>
+
+            {/* Suggest a new course */}
+            <section style={{ marginBottom: 32 }}>
+              <h3 className="section-title">
+                <BookOpen size={15} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
+                Suggest a New Course
+              </h3>
+              <p className="muted" style={{ marginBottom: 14 }}>
+                Don't see a course you need? Suggest it — an admin will review your idea.
+              </p>
+              <form className="pw-form" onSubmit={suggestCourse}>
+                <input placeholder="Course title (e.g. Machine Learning Basics)"
+                  value={courseReq.title}
+                  onChange={(e) => setCourseReq({ ...courseReq, title: e.target.value })} required />
+                <textarea placeholder="Brief description (optional) — what should this course cover?"
+                  value={courseReq.description}
+                  onChange={(e) => setCourseReq({ ...courseReq, description: e.target.value })}
+                  rows={3} style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid #d1d5db", fontSize: "0.95rem", resize: "vertical" }} />
+                {courseErr && <p className="error-msg">{courseErr}</p>}
+                {courseMsg && <p className="success-msg" style={{ display: "flex", alignItems: "center", gap: 5 }}><CheckCircle size={14} /> {courseMsg}</p>}
+                <button type="submit" className="btn btn-primary">Submit Suggestion</button>
+              </form>
+            </section>
           </motion.div>
         )}
 
         {tab === "settings" && (
           <motion.div key="settings" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+
+            {/* Edit profile */}
+            <section style={{ marginBottom: 32 }}>
+              <h3 className="section-title">
+                <User size={15} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
+                Edit Profile
+              </h3>
+              <form className="pw-form" onSubmit={saveProfile}>
+                <label style={{ fontSize: 13, color: "#6b7280", marginBottom: 2, display: "block" }}>Username</label>
+                <input placeholder="Username"
+                  value={profileForm.username}
+                  onChange={(e) => setProfileForm({ ...profileForm, username: e.target.value })} />
+                <label style={{ fontSize: 13, color: "#6b7280", marginBottom: 2, display: "block" }}>Avatar URL</label>
+                <input placeholder="https://example.com/your-avatar.jpg"
+                  value={profileForm.avatar_url}
+                  onChange={(e) => setProfileForm({ ...profileForm, avatar_url: e.target.value })} />
+                {profileForm.avatar_url && (
+                  <div style={{ marginBottom: 8 }}>
+                    <img src={profileForm.avatar_url} alt="preview"
+                      onError={(e) => { e.target.style.display = "none"; }}
+                      style={{ width: 56, height: 56, borderRadius: "50%", objectFit: "cover", border: "2px solid #e5e7eb" }} />
+                    <span style={{ fontSize: 12, color: "#9ca3af", marginLeft: 8 }}>Preview</span>
+                  </div>
+                )}
+                {profileErr && <p className="error-msg">{profileErr}</p>}
+                {profileMsg && <p className="success-msg" style={{ display: "flex", alignItems: "center", gap: 5 }}><CheckCircle size={14} /> {profileMsg}</p>}
+                <button type="submit" className="btn btn-primary">Save Changes</button>
+              </form>
+            </section>
             <section style={{ marginBottom: 32 }}>
               <h3 className="section-title">
                 <Lock size={15} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />

@@ -83,7 +83,28 @@ def get_recommendations(user_id: int, topic_id: int, db: Session, top_n: int = 6
 
     # Cold start: user has no ratings — return most popular cross-topic resources
     if not matrix.size or user_id not in u_idx:
-        return _popularity_fallback(candidate_map, db, top_n, user_id=user_id)
+        recs = _popularity_fallback(candidate_map, db, top_n, user_id=user_id)
+        # If truly no onboarding data either, boost the top-5 globally popular resources
+        # so the recommender has a starting signal on next call
+        if not recs:
+            return []
+        # Auto-seed engagement for brand-new users with zero signal
+        from app.models.models import OnboardingAnswer, Engagement
+        has_onboarding = db.query(OnboardingAnswer).filter_by(user_id=user_id).first()
+        has_engagement = db.query(Engagement).filter_by(user_id=user_id).first()
+        if not has_onboarding and not has_engagement:
+            # Silently record a minimal implicit engagement for top-3 popular resources
+            # so next request has CF signal — low score so it doesn't dominate
+            for rec in recs[:3]:
+                existing = db.query(Engagement).filter_by(user_id=user_id, resource_id=rec["id"]).first()
+                if not existing:
+                    db.add(Engagement(
+                        user_id=user_id, resource_id=rec["id"],
+                        watch_completion=0.1, revisit_count=0,
+                        completed=False, time_spent=0,
+                    ))
+            db.commit()
+        return recs
 
     idx = u_idx[user_id]
     r_col_map = {rid: i for i, rid in enumerate(resource_ids)}
