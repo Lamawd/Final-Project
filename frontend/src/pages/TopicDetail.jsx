@@ -135,15 +135,15 @@ export default function TopicDetail() {
   const markTopicComplete = async () => {
     const next = !topicCompleted;
     if (next) {
-      // Show quiz before marking complete
       try {
         const res = await api.get(`/topics/${id}/quiz`);
-        setQuizModal({ questions: res.data.questions, pendingComplete: true });
+        setQuizModal({ questions: res.data.questions });
       } catch {
-        // If quiz fails, just mark complete normally
-        await api.post(`/topics/${id}/progress`, null, { params: { completed: true } });
-        setTopicCompleted(true);
-        if (course) setTimeout(() => navigate(`/courses/${course.id}`), 800);
+        // Gemini totally unreachable — show fallback modal anyway
+        setQuizModal({ questions: [
+          { q: `How well did you understand ${topic?.title}?`,
+            options: ["Very well", "Mostly", "A little", "Not really"], answer: 0 },
+        ]});
       }
     } else {
       await api.post(`/topics/${id}/progress`, null, { params: { completed: false } });
@@ -484,29 +484,50 @@ function LowRatingModal({ stars, onSubmit, onSkip }) {
 }
 
 function QuizModal({ questions, topicTitle, onFinish, onSkip }) {
-  const [step, setStep]       = useState(0);   // which question (0,1,2)
-  const [answers, setAnswers] = useState({});  // {0: "user answer", ...}
-  const [showHint, setShowHint] = useState({});
+  const [step, setStep]       = useState(0);
+  const [selected, setSelected] = useState(null);   // index of chosen option
+  const [revealed, setRevealed] = useState(false);  // show correct/wrong feedback
+  const [score, setScore]     = useState(0);
   const [done, setDone]       = useState(false);
 
   const current = questions[step];
   const isLast  = step === questions.length - 1;
 
+  const handleSelect = (idx) => {
+    if (revealed) return;
+    setSelected(idx);
+  };
+
+  const handleConfirm = () => {
+    if (selected === null) return;
+    const correct = selected === current.answer;
+    setRevealed(true);
+    if (correct) setScore((s) => s + 1);
+  };
+
   const handleNext = () => {
-    if (isLast) setDone(true);
-    else setStep((s) => s + 1);
+    if (isLast) { setDone(true); return; }
+    setStep((s) => s + 1);
+    setSelected(null);
+    setRevealed(false);
   };
 
   if (done) {
+    const total = questions.length;
+    const pct   = Math.round((score / total) * 100);
     return (
       <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
         <motion.div className="modal-box" initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.88, opacity: 0 }}>
           <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Sparkles size={20} color="#4f46e5" /> Quiz complete!
+            <Sparkles size={20} color="#4f46e5" /> Quiz Result
           </h3>
-          <p style={{ margin: "12px 0", color: "#6b7280" }}>
-            Great job reflecting on <strong>{topicTitle.replace(/^[^:]+: /, "")}</strong>.
-            Your answers have been noted — keep it up!
+          <p style={{ margin: "14px 0 6px", fontSize: "1.1rem", fontWeight: 600 }}>
+            {score} / {total} correct ({pct}%)
+          </p>
+          <p style={{ color: "#6b7280", fontSize: "0.9rem", marginBottom: 16 }}>
+            {pct === 100 ? "Perfect! Great understanding 🎉" :
+             pct >= 60  ? "Good job! Keep it up 👍" :
+                          "No worries — reviewing again helps 📖"}
           </p>
           <div className="modal-actions">
             <button className="btn btn-primary" onClick={onFinish}>
@@ -521,47 +542,56 @@ function QuizModal({ questions, topicTitle, onFinish, onSkip }) {
 
   return (
     <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-      <motion.div className="modal-box" style={{ maxWidth: 480 }} initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.88, opacity: 0 }}>
+      <motion.div className="modal-box" style={{ maxWidth: 500 }} initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.88, opacity: 0 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
           <h3 style={{ display: "flex", alignItems: "center", gap: 8, margin: 0 }}>
             <Sparkles size={18} color="#4f46e5" /> Quick Quiz
           </h3>
           <span style={{ fontSize: 13, color: "#9ca3af" }}>{step + 1} / {questions.length}</span>
         </div>
-        <p style={{ margin: "14px 0 8px", fontWeight: 500 }}>{current.q}</p>
-        <textarea
-          className="reason-input"
-          placeholder="Type your answer…"
-          value={answers[step] || ""}
-          onChange={(e) => setAnswers((prev) => ({ ...prev, [step]: e.target.value }))}
-          rows={3}
-          style={{ width: "100%", boxSizing: "border-box" }}
-        />
-        {current.hint && (
-          <div style={{ marginTop: 6 }}>
-            {showHint[step] ? (
-              <p style={{ fontSize: 13, color: "#6b7280", margin: 0 }}>
-                💡 {current.hint}
-              </p>
-            ) : (
+
+        <p style={{ margin: "14px 0 12px", fontWeight: 500, lineHeight: 1.5 }}>{current.q}</p>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {current.options.map((opt, idx) => {
+            let bg = "#f9fafb", border = "#e5e7eb", color = "#111827";
+            if (revealed) {
+              if (idx === current.answer)        { bg = "#d1fae5"; border = "#10b981"; color = "#065f46"; }
+              else if (idx === selected)         { bg = "#fee2e2"; border = "#ef4444"; color = "#991b1b"; }
+            } else if (idx === selected)         { bg = "#ede9fe"; border = "#4f46e5"; color = "#3730a3"; }
+            return (
               <button
-                className="btn"
-                style={{ fontSize: 12, padding: "2px 10px" }}
-                onClick={() => setShowHint((prev) => ({ ...prev, [step]: true }))}
+                key={idx}
+                onClick={() => handleSelect(idx)}
+                style={{
+                  textAlign: "left", padding: "10px 14px", borderRadius: 8,
+                  border: `2px solid ${border}`, background: bg, color,
+                  cursor: revealed ? "default" : "pointer",
+                  fontWeight: idx === selected ? 600 : 400,
+                  transition: "all 0.15s",
+                }}
               >
-                Show hint
+                <span style={{ marginRight: 8, fontWeight: 700 }}>
+                  {["A", "B", "C", "D"][idx]}.
+                </span>
+                {opt}
+                {revealed && idx === current.answer && " ✓"}
+                {revealed && idx === selected && idx !== current.answer && " ✗"}
               </button>
-            )}
-          </div>
-        )}
+            );
+          })}
+        </div>
+
         <div className="modal-actions" style={{ marginTop: 16 }}>
-          <button
-            className="btn btn-primary"
-            onClick={handleNext}
-            disabled={!answers[step]?.trim()}
-          >
-            {isLast ? "Finish" : "Next"}
-          </button>
+          {!revealed ? (
+            <button className="btn btn-primary" onClick={handleConfirm} disabled={selected === null}>
+              Confirm
+            </button>
+          ) : (
+            <button className="btn btn-primary" onClick={handleNext}>
+              {isLast ? "See Results" : "Next →"}
+            </button>
+          )}
           <button className="btn" onClick={onSkip} style={{ fontSize: 13 }}>Skip quiz</button>
         </div>
       </motion.div>

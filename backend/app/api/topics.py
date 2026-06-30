@@ -76,14 +76,29 @@ async def get_quiz(topic_id: int, db: Session = Depends(get_db),
         raise HTTPException(status_code=404, detail="Topic not found")
 
     gemini_key = os.environ.get("GEMINI_API_KEY", "")
+
+    # Fallback questions if Gemini is unavailable
+    fallback = {"questions": [
+        {"q": f"How confident are you in your understanding of {topic.title}?",
+         "options": ["Very confident", "Mostly understand", "Still a bit unclear", "Need to review again"],
+         "answer": 0},
+        {"q": f"Which best describes what you did to learn {topic.title}?",
+         "options": ["Watched all videos and read articles", "Watched videos only", "Read articles only", "Just skimmed through"],
+         "answer": 0},
+        {"q": "Would you feel comfortable explaining this topic to someone else?",
+         "options": ["Yes, definitely", "Mostly yes", "Not quite yet", "No, I need more practice"],
+         "answer": 0},
+    ]}
+
     if not gemini_key:
-        raise HTTPException(status_code=503, detail="Quiz unavailable: GEMINI_API_KEY not set")
+        return fallback
 
     prompt = (
-        f'Generate exactly 3 short comprehension questions to test if someone just learned about "{topic.title}".\n'
+        f'Generate exactly 3 multiple choice questions to test if someone just learned about "{topic.title}".\n'
         f'Topic description: {topic.description or "a programming/tech topic"}\n'
         f'Return ONLY valid JSON, no markdown, no extra text.\n'
-        f'Format: {{"questions": [{{"q": "question text", "hint": "short hint"}}]}}'
+        f'Format: {{"questions": [{{"q": "question text", "options": ["A", "B", "C", "D"], "answer": 0}}]}}\n'
+        f'"answer" is the index (0-3) of the correct option.'
     )
 
     try:
@@ -94,15 +109,13 @@ async def get_quiz(topic_id: int, db: Session = Depends(get_db),
             )
         resp.raise_for_status()
         raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-        # Strip markdown code fences if Gemini adds them
         raw = raw.strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
         return json.loads(raw)
-    except httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=502, detail=f"Gemini API error: {e.response.status_code}")
     except Exception:
-        raise HTTPException(status_code=502, detail="Failed to generate quiz. Try again.")
+        # Always return something — never let quiz block completion
+        return fallback
 
 
 @router.get("/progress/me")
