@@ -77,45 +77,72 @@ async def get_quiz(topic_id: int, db: Session = Depends(get_db),
 
     gemini_key = os.environ.get("GEMINI_API_KEY", "")
 
-    # Fallback questions if Gemini is unavailable
-    fallback = {"questions": [
-        {"q": f"How confident are you in your understanding of {topic.title}?",
-         "options": ["Very confident", "Mostly understand", "Still a bit unclear", "Need to review again"],
-         "answer": 0},
-        {"q": f"Which best describes what you did to learn {topic.title}?",
-         "options": ["Watched all videos and read articles", "Watched videos only", "Read articles only", "Just skimmed through"],
-         "answer": 0},
-        {"q": "Would you feel comfortable explaining this topic to someone else?",
-         "options": ["Yes, definitely", "Mostly yes", "Not quite yet", "No, I need more practice"],
-         "answer": 0},
-    ]}
-
-    if not gemini_key:
-        return fallback
-
     prompt = (
-        f'Generate exactly 3 multiple choice questions to test if someone just learned about "{topic.title}".\n'
+        f'Generate exactly 3 multiple choice questions to test knowledge of "{topic.title}".\n'
         f'Topic description: {topic.description or "a programming/tech topic"}\n'
+        f'Rules:\n'
+        f'- Questions must test actual understanding of the topic concepts, not feelings\n'
+        f'- Each question must have exactly 4 options\n'
+        f'- Only one option is correct\n'
+        f'- "answer" is the 0-based index of the correct option\n'
+        f'- Make the wrong options plausible (not obviously wrong)\n'
         f'Return ONLY valid JSON, no markdown, no extra text.\n'
-        f'Format: {{"questions": [{{"q": "question text", "options": ["A", "B", "C", "D"], "answer": 0}}]}}\n'
-        f'"answer" is the index (0-3) of the correct option.'
+        f'Format: {{"questions": [{{"q": "question text", "options": ["option0", "option1", "option2", "option3"], "answer": 0}}]}}'
     )
 
-    try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            resp = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
-                json={"contents": [{"parts": [{"text": prompt}]}]},
-            )
-        resp.raise_for_status()
-        raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-        raw = raw.strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-        return json.loads(raw)
-    except Exception:
-        # Always return something — never let quiz block completion
-        return fallback
+    if gemini_key:
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                resp = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
+                    json={"contents": [{"parts": [{"text": prompt}]}]},
+                )
+            resp.raise_for_status()
+            raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+            raw = raw.strip()
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+            data = json.loads(raw)
+            if "questions" in data and len(data["questions"]) > 0:
+                return data
+        except Exception:
+            pass  # fall through to local generation
+
+    # Local fallback: use Gemini-style questions derived from topic title keywords
+    title = topic.title
+    desc  = topic.description or ""
+    return {"questions": [
+        {
+            "q": f"What is the primary purpose of {title}?",
+            "options": [
+                f"To {desc[:60].rstrip()}..." if len(desc) > 20 else f"To understand core concepts of {title}",
+                f"To replace all existing programming paradigms",
+                f"To generate random outputs without structure",
+                f"To slow down application performance intentionally",
+            ],
+            "answer": 0,
+        },
+        {
+            "q": f"Which statement about {title} is most accurate?",
+            "options": [
+                f"It is a well-defined concept used in software development",
+                f"It only applies to hardware-level programming",
+                f"It was invented last year and has no real applications",
+                f"It is only relevant to mobile app development",
+            ],
+            "answer": 0,
+        },
+        {
+            "q": f"After learning {title}, a developer would be able to:",
+            "options": [
+                f"Apply its concepts to solve related real-world problems",
+                f"Eliminate the need for any other programming knowledge",
+                f"Build only front-end applications",
+                f"Only work with legacy codebases",
+            ],
+            "answer": 0,
+        },
+    ]}
 
 
 @router.get("/progress/me")
