@@ -1,0 +1,1307 @@
+\documentclass[12pt,a4paper]{report}
+
+% --- Packages ---
+\usepackage{fontspec}
+\usepackage[english]{babel}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=black, urlcolor=blue, citecolor=black}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{tocbibind}
+\usepackage{caption}
+\usepackage{amsmath}
+
+% --- Page style ---
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\leftmark}
+\lhead{Opic -- Learning Platform}
+\cfoot{\thepage}
+
+% --- Code listing style ---
+\lstdefinestyle{code}{
+  backgroundcolor=\color{gray!10},
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  frame=single,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{green!60!black},
+  stringstyle=\color{orange},
+}
+\lstset{style=code}
+
+% Helper for missing figures
+\newcommand{\missingfig}[2]{%
+  \begin{center}
+    \fbox{\parbox{0.7\textwidth}{\centering\vspace{1.5cm}%
+      \textit{[Figure placeholder: #1]}\\[0.3cm]%
+      \small #2\vspace{1.5cm}}}%
+  \end{center}%
+}
+
+\date{June 2026}
+
+\begin{document}
+
+% ============================================================
+% TITLE PAGE
+% ============================================================
+\begin{titlepage}
+\centering
+
+% University logo (place logo.png in the same folder as this .tex file)
+\IfFileExists{logo.png}{%
+  \includegraphics[width=3.5cm]{logo.png}\\[0.5cm]%
+}{%
+  \fbox{\parbox{3.5cm}{\centering\vspace{0.8cm}\small[University Logo]\vspace{0.8cm}}}\\[0.5cm]%
+}
+
+\textbf{\large UNIVERSITY OF SCIENCE AND TECHNOLOGY OF HANOI}\\[0.2cm]
+\textbf{\large DEPARTMENT OF INFORMATION AND COMMUNICATION TECHNOLOGY}\\[2.5cm]
+
+{\fontsize{36}{42}\selectfont \textbf{OPIC}}\\[0.8cm]
+{\large A Personalised Learning Platform with}\\
+{\large Collaborative Filtering Recommendations}\\[2.5cm]
+
+{\large \textbf{BACHELOR THESIS}}\\[2.5cm]
+
+\begin{flushleft}
+\hspace{3cm}\begin{tabular}{ll}
+\textbf{Student:} & Vũ Tùng Lâm \\[0.3cm]
+\textbf{Student ID:} & 22BI13241 \\[0.3cm]
+\textbf{Supervisor:} & Trương Trọng Tuấn \\
+\end{tabular}
+\end{flushleft}
+
+\vfill
+{\large Hanoi, 2026}
+\end{titlepage}
+\thispagestyle{empty}
+
+% ============================================================
+% DECLARATION
+% ============================================================
+\chapter*{Declaration}
+\thispagestyle{empty}
+
+I hereby declare that this thesis, titled ``Opic -- A Personalised Learning Platform with Collaborative Filtering Recommendations'', is the result of my own work carried out under the guidance of my supervisor. All sources of information, data, figures, and prior work used in this report have been duly acknowledged and cited. The system, experiments, and results presented here are genuine and have not been submitted, in whole or in part, for any other degree or qualification.
+
+\vspace{2cm}
+\noindent Hanoi, 2026
+
+\vspace{1.5cm}
+\noindent .................................\\
+Vũ Tùng Lâm
+
+\newpage
+
+% ============================================================
+% ACKNOWLEDGEMENTS
+% ============================================================
+\chapter*{Acknowledgements}
+\addcontentsline{toc}{chapter}{Acknowledgements}
+
+First and foremost, I would like to express my sincere gratitude to my supervisor for the continuous guidance, patience, and encouragement throughout this project. Without the constructive feedback and valuable suggestions, this work would not have reached its current state.
+
+I would also like to thank my friends for their willingness to test the platform and provide feedback during the development phase. Their input helped surface bugs and usability issues that were fixed before the final submission.
+
+Finally, thank you to my family for the support and understanding during the long nights of coding, debugging, and writing.
+
+\newpage
+
+% ============================================================
+% TABLE OF CONTENTS
+% ============================================================
+\tableofcontents
+\newpage
+
+% ============================================================
+% LIST OF FIGURES
+% ============================================================
+\listoffigures
+\addcontentsline{toc}{chapter}{List of Figures}
+\newpage
+
+% ============================================================
+% LIST OF TABLES
+% ============================================================
+\listoftables
+\addcontentsline{toc}{chapter}{List of Tables}
+\newpage
+
+% ============================================================
+% CHAPTER 1 -- INTRODUCTION
+% ============================================================
+\chapter{Introduction}
+
+\section{Context and Motivation}
+
+The amount of learning content available online today is almost overwhelming. Platforms like YouTube, Coursera, and Medium publish thousands of articles, videos, and tutorials every day. For a student trying to learn something new -- say, data structures or web development -- the real problem is not finding content; it is figuring out \textit{what to learn, in what order, and what is actually worth their time}.
+
+This is the problem that motivated the development of \textbf{Opic}. The name comes from the word \textit{topic} -- the fundamental unit of learning in the system. Opic is a web-based learning platform that organises knowledge into structured topic roadmaps, lets the community contribute and rate resources, and uses a recommendation engine to surface relevant materials for each individual user based on their behaviour and interests.
+
+The system was built with university students in mind, particularly those studying Information and Communication Technology (ICT), Data Science (DS), and Business Information Technology (BIT), where self-directed learning is common and the volume of online material can be disorienting.
+
+\section{Objectives}
+
+The primary goal of this project was to design and build a functional, deployable learning platform that addresses three core problems a student faces when navigating online learning materials:
+
+\begin{enumerate}
+  \item \textbf{Navigation:} Not knowing what to learn first or next.
+  \item \textbf{Quality filtering:} Not knowing which resources are actually good.
+  \item \textbf{Personalisation:} Receiving the same generic content regardless of background or interests.
+\end{enumerate}
+
+These three challenges are addressed respectively through structured topic roadmaps, a community-driven rating and admin-review pipeline, and a user-based collaborative filtering recommendation engine.
+
+\section{Expected Outcome}
+
+The following outcomes were achieved by the end of the project:
+
+\begin{itemize}
+  \item A fully deployed, publicly accessible web application where any user can register, complete the onboarding quiz, browse structured topic roadmaps, and access curated resources.
+  \item A working recommendation engine that provides personalised resource suggestions from the first login (via onboarding cold-start) and improves as users rate and complete more content.
+  \item A complete admin pipeline where content can be submitted by any registered user, reviewed by admins, and published or rejected -- maintaining content quality without manual curation of the entire library.
+  \item A progress tracking system that allows users to mark topics as completed and view their learning activity over a 30-day period.
+  \item A JWT-based authentication system with a secure password reset flow, protecting all state-mutating endpoints behind role-aware access control.
+  \item A clean client-server deployment on free-tier cloud infrastructure (Vercel for the frontend, Render for the backend and database), with CI/CD triggered automatically on every push to the main branch.
+\end{itemize}
+
+\section{Desired Features and Design Decisions}
+
+At the start of the project, the following features were identified as essential requirements. Each feature directly informed an architectural and design decision that is elaborated in Chapters 4 and 5.
+
+\begin{itemize}
+  \item \textbf{AI-generated knowledge quiz} -- drove the design of the \texttt{GET /topics/\{id\}/quiz} endpoint, the Gemini API integration, and the \texttt{QuizModal} component on the topic detail page.
+  \item \textbf{User registration, login, and JWT-based authentication} -- drove the design of the \texttt{users} table, the \texttt{/auth} API module, and the React Context-based auth state management on the frontend.
+  \item \textbf{Structured topic roadmaps with prerequisite relationships} -- drove the design of the \texttt{topics} and \texttt{topic\_prerequisites} tables and the topic detail page layout.
+  \item \textbf{Community resource submission} -- drove the resource submission form and the \texttt{resources} table with a \texttt{status} field to gate visibility.
+  \item \textbf{Admin review workflow} -- drove the dedicated admin review page and the \texttt{POST /resources/\{id\}/review} endpoint with role checking.
+  \item \textbf{Star ratings and engagement tracking} -- drove the \texttt{ratings} and \texttt{engagements} tables and the engagement-score formula used in the recommender.
+  \item \textbf{Personalised recommendations using collaborative filtering} -- drove the design of the recommender service, including the user-resource matrix, cosine similarity computation, and Bayesian average popularity score.
+  \item \textbf{Cold-start onboarding quiz} -- drove the \texttt{onboarding\_questions} and \texttt{onboarding\_answers} tables and the topic-boosting logic in the cold-start fallback.
+  \item \textbf{Progress tracking per topic} -- drove the \texttt{user\_progress} table and the progress page with the 30-day activity heatmap.
+  \item \textbf{Admin dashboard for user and content management} -- drove the admin user management page and the safeguard that prevents deletion of admin accounts.
+\end{itemize}
+
+These design decisions are described in full in the System Architecture (Chapter 4) and Database Design (Chapter 5) chapters.
+
+\section{Thesis Structure}
+
+The remainder of this report is organised as follows. Chapter 2 presents the functional and non-functional requirements alongside the use case model. Chapter 3 describes the development methodology and testing strategy. Chapter 4 covers the system architecture and deployment setup. Chapter 5 details the database design. Chapter 6 walks through the implementation of each key use case. Chapter 7 lists the tools and libraries used. Chapter 8 presents the results and evaluates the system against its requirements. Chapter 9 discusses challenges and limitations. Chapter 10 concludes with a summary and directions for future work.
+
+% ============================================================
+% CHAPTER 2 -- REQUIREMENT ANALYSIS
+% ============================================================
+\chapter{Requirement Analysis}
+
+This chapter defines the complete set of requirements for the Opic platform. Section~\ref{sec:func-req} lists the functional requirements. Section~\ref{sec:user-req} captures the requirements from each user role's perspective. Section~\ref{sec:nonfunc-req} covers non-functional constraints. Section~\ref{sec:usecases} presents the use case model with diagrams and detailed use case specifications.
+
+\section{Overall Functional Requirements}
+\label{sec:func-req}
+
+Table~\ref{tab:func-req} summarises the fourteen functional requirements identified during the initial design phase. These requirements were derived directly from the desired features described in Chapter 1 and served as the acceptance criteria for the final evaluation in Chapter 8.
+
+\begin{longtable}{p{0.08\textwidth} p{0.35\textwidth} p{0.45\textwidth}}
+\caption{Functional Requirements}\label{tab:func-req}\\
+\toprule
+\textbf{ID} & \textbf{Requirement} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{ID} & \textbf{Requirement} & \textbf{Description} \\
+\midrule
+\endhead
+FR-01 & User Registration & New users can create an account with username, email, and password. \\
+FR-02 & User Login & Registered users can log in and receive a JWT access token. \\
+FR-03 & Password Reset & Users can request a reset code via email to change their password. \\
+FR-04 & Topic Browsing & Users can view all topics grouped by course with prerequisite information. \\
+FR-05 & Resource Access & Users can view approved resources for any topic. \\
+FR-06 & Resource Submission & Logged-in users can submit a resource URL for admin review. \\
+FR-07 & Resource Rating & Users can rate a resource 1--5 stars with optional feedback. \\
+FR-08 & Engagement Tracking & The system records watch completion, time spent, revisits, and completion. \\
+FR-09 & Topic Progress & Users can mark topics as completed and track overall progress. \\
+FR-10 & Onboarding Quiz & New users answer questions to seed the recommendation engine. \\
+FR-11 & Recommendations & The system recommends resources personalised to each user. \\
+FR-12 & Admin Review & Admins can approve or reject pending resource submissions. \\
+FR-13 & Admin User Management & Admins can view and delete user accounts. \\
+FR-14 & Home Feed & The homepage shows personalised picks and a weekly featured video. \\
+FR-15 & AI Knowledge Quiz & When marking a topic complete, the system presents a 5-question AI-generated multiple choice quiz. Users who answer 3 or more incorrectly are prompted to retry before completing. \\
+\bottomrule
+\end{longtable}
+
+Each requirement is traceable to a specific implementation component: the use cases in Section~\ref{sec:usecases} expand on how they are realised, and Chapter 8 confirms their final status.
+
+\section{User Requirements}
+\label{sec:user-req}
+
+The system has two distinct user roles: \textit{Learner} (a regular registered user) and \textit{Administrator}. The requirements below reflect the goals and expectations of each role, gathered through informal interviews and self-directed testing during development.
+
+\subsection{Learner (Regular User)}
+
+The learner's primary interaction with the platform revolves around discovering, consuming, and rating learning resources. The key needs expressed during requirement gathering were:
+
+\begin{itemize}
+  \item I want to see a clear path of what topics to study and in what order.
+  \item I want to rate resources so I can remember which ones were useful.
+  \item I want the platform to suggest resources I have not seen yet, based on what I have done.
+  \item I want to track my progress and see how much of a course I have completed.
+  \item I want to contribute resources I found useful so other learners can benefit.
+\end{itemize}
+
+These needs map directly to FR-04, FR-07, FR-11, FR-09, and FR-06 respectively.
+
+\subsection{Administrator}
+
+The administrator's role is to maintain the quality of the content library and the integrity of the user base. The requirements identified for this role were:
+
+\begin{itemize}
+  \item I want to review submitted resources before they go live to maintain quality.
+  \item I want to see all registered users and be able to remove bad actors.
+  \item I want the platform to prevent me from accidentally deleting admin accounts.
+\end{itemize}
+
+These needs map to FR-12, FR-13, and the guard condition in the admin user management endpoint.
+
+\section{Non-Functional Requirements}
+\label{sec:nonfunc-req}
+
+Beyond functional behaviour, a number of non-functional constraints were identified to ensure the system is secure, performant, and maintainable. Table~\ref{tab:nonfunc-req} lists these constraints along with the design decisions they drove.
+
+\begin{longtable}{p{0.08\textwidth} p{0.22\textwidth} p{0.58\textwidth}}
+\caption{Non-Functional Requirements}\label{tab:nonfunc-req}\\
+\toprule
+\textbf{ID} & \textbf{Category} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{ID} & \textbf{Category} & \textbf{Description} \\
+\midrule
+\endhead
+NFR-01 & Security & Passwords are hashed using bcrypt. Authentication uses signed JWT tokens with configurable expiry. \\
+NFR-02 & Security & All state-mutating endpoints require authentication. Admin endpoints require an admin role check. \\
+NFR-03 & Performance & API responses for non-recommendation endpoints should complete under 300\,ms under normal load. \\
+NFR-04 & Usability & The interface should be usable on both desktop and mobile browsers without requiring installation. \\
+NFR-05 & Availability & The system is deployed on cloud infrastructure with automatic restarts on failure. \\
+NFR-06 & Maintainability & Backend and frontend are separated into independent deployable units. \\
+NFR-07 & Data integrity & Database constraints enforce referential integrity across all relationships. \\
+NFR-08 & CORS & The API enforces an allowlist of trusted frontend origins. \\
+\bottomrule
+\end{longtable}
+
+NFR-01 and NFR-02 directly influenced the security architecture described in Chapter 4. NFR-06 shaped the decision to deploy the frontend and backend as completely separate services. The CORS configuration (NFR-08) became critical during deployment and is discussed further in Chapter 9.
+
+\section{Use Cases}
+\label{sec:usecases}
+
+\subsection{Use Case Summary}
+
+Before examining the diagrams and detailed specifications, Table~\ref{tab:uc-summary} provides a consolidated overview of all use cases in the system, their actors, and their corresponding functional requirements. This serves as a navigation guide for the remainder of this section.
+
+\begin{longtable}{p{0.12\textwidth} p{0.28\textwidth} p{0.15\textwidth} p{0.32\textwidth}}
+\caption{Use Case Summary}\label{tab:uc-summary}\\
+\toprule
+\textbf{ID} & \textbf{Name} & \textbf{Actor} & \textbf{Related FR} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{ID} & \textbf{Name} & \textbf{Actor} & \textbf{Related FR} \\
+\midrule
+\endhead
+UC-01 & Register Account & Learner & FR-01 \\
+UC-02 & Log In & Learner & FR-02 \\
+UC-03 & Reset Password & Learner & FR-03 \\
+UC-04 & Rate a Resource & Learner & FR-07, FR-11 \\
+UC-05 & Submit a Resource & Learner & FR-06 \\
+UC-06 & Track Topic Progress & Learner & FR-09 \\
+UC-07 & View Personalised Recommendations & Learner & FR-11, FR-10 \\
+UC-08 & Admin Review Submission & Admin & FR-12 \\
+UC-09 & Manage Users & Admin & FR-13 \\
+UC-10 & Complete Onboarding Quiz & Learner & FR-10, FR-11 \\
+UC-11 & Complete AI Knowledge Quiz & Learner & FR-15 \\
+\bottomrule
+\end{longtable}
+
+\subsection{Overall Use Case Diagram}
+
+Figure~\ref{fig:ucd-overall} shows the complete use case diagram for the Opic system, illustrating the interactions between the two actors and all ten use cases.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{ucd.png}{\includegraphics[width=0.6\textwidth]{ucd.png}}{\missingfig{ucd.png}{Overall Use Case Diagram}}
+\caption{Overall Use Case Diagram}
+\label{fig:ucd-overall}
+\end{figure}
+
+The diagram highlights that the Learner role is the primary actor, interacting with the majority of use cases, while the Admin role is responsible for content governance and user management.
+
+\subsection{Use Case Diagram -- Authentication}
+
+Figure~\ref{fig:ucd-auth} zooms into the authentication module, covering registration, login, and password reset. These three use cases form the security boundary for all other interactions.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{ucd_auth.png}{\includegraphics[width=0.75\textwidth]{ucd_auth.png}}{\missingfig{ucd\_auth.png}{Authentication Use Case Diagram}}
+\caption{Use Case Diagram -- Authentication Module}
+\label{fig:ucd-auth}
+\end{figure}
+
+\subsection{Use Case Diagram -- Resource Management}
+
+Figure~\ref{fig:ucd-resource} shows the resource management flow, from learner submission through admin review to public availability. The separation between the submission (Learner) and approval (Admin) actors is the central design principle of the content pipeline.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{ucd_resource.png}{\includegraphics[width=0.75\textwidth]{ucd_resource.png}}{\missingfig{ucd\_resource.png}{Resource Management Use Case Diagram}}
+\caption{Use Case Diagram -- Resource Management}
+\label{fig:ucd-resource}
+\end{figure}
+
+\subsection{Detailed Use Cases}
+
+The following tables provide detailed specifications for the three most complex use cases. The remaining use cases (UC-01 through UC-03, UC-05, UC-06, UC-09, UC-10) follow standard CRUD patterns and are fully covered by the sequence diagrams in Chapter 6.
+
+\begin{longtable}{p{0.2\textwidth} p{0.72\textwidth}}
+\caption{UC-04: Rate a Resource}\label{tab:uc04}\\
+\toprule
+\textbf{Field} & \textbf{Detail} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Field} & \textbf{Detail} \\
+\midrule
+\endhead
+Use Case ID & UC-04 \\
+Name & Rate a Resource \\
+Actor & Learner \\
+Precondition & User is logged in and has accessed a topic detail page. \\
+Main Flow & 1. User views a resource on a topic page. \newline 2. User selects a star rating (1--5). \newline 3. Optionally provides a reason if rating is low (1--2 stars). \newline 4. System saves the rating and updates the recommendation model. \\
+Postcondition & Rating is stored. Future recommendations reflect this preference. \\
+Exception & If stars not in range 1--5, system returns HTTP 400. \\
+\bottomrule
+\end{longtable}
+
+\begin{longtable}{p{0.2\textwidth} p{0.72\textwidth}}
+\caption{UC-07: View Personalised Recommendations}\label{tab:uc07}\\
+\toprule
+\textbf{Field} & \textbf{Detail} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Field} & \textbf{Detail} \\
+\midrule
+\endhead
+Use Case ID & UC-07 \\
+Name & View Personalised Recommendations \\
+Actor & Learner \\
+Precondition & User is logged in. \\
+Main Flow & 1. User opens a topic detail page or the home feed. \newline 2. System computes similarity between the user and all others. \newline 3. Resources rated highly by similar users are ranked and returned. \newline 4. User sees up to 6 recommended resources from other topics. \\
+Postcondition & Recommendations are displayed. \\
+Exception & If user has no ratings, system falls back to popularity ranking boosted by onboarding answers. \\
+\bottomrule
+\end{longtable}
+
+\begin{longtable}{p{0.2\textwidth} p{0.72\textwidth}}
+\caption{UC-08: Admin Review Submission}\label{tab:uc08}\\
+\toprule
+\textbf{Field} & \textbf{Detail} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Field} & \textbf{Detail} \\
+\midrule
+\endhead
+Use Case ID & UC-08 \\
+Name & Review Pending Resource \\
+Actor & Admin \\
+Precondition & At least one resource is in \texttt{pending} status. \\
+Main Flow & 1. Admin opens the Admin Review page. \newline 2. System lists all pending submissions with title, URL, submitter, and topic. \newline 3. Admin clicks Approve or Reject. \newline 4. Resource status is updated to \texttt{approved} or \texttt{rejected}. \\
+Postcondition & Approved resources become visible to all learners. Rejected resources are hidden. \\
+\bottomrule
+\end{longtable}
+
+Together, these use cases define the interaction boundaries of the system. The next chapter describes the development methodology and testing strategy used to implement them.
+
+% ============================================================
+% CHAPTER 3 -- METHODOLOGY
+% ============================================================
+\chapter{Methodology}
+
+This chapter describes the development approach, version control strategy, and testing methodology used throughout the project. The choices made here had a direct impact on how quickly integration issues were identified and resolved during the ten-week build.
+
+\section{Development Approach}
+
+This project was developed over approximately three months, from early April to late June 2026. Rather than following a strict waterfall model, development was organised into an \textbf{iterative, feature-driven} process. Work progressed in phases, each centred on a specific feature group, so that each feature was working end-to-end before the next one began. Integration issues were therefore caught early rather than accumulating into a large unresolved backlog at the end.
+
+Table~\ref{tab:timeline} summarises the six phases of development and the work completed in each.
+
+\begin{longtable}{p{0.25\textwidth} p{0.65\textwidth}}
+\caption{Development Timeline}\label{tab:timeline}\\
+\toprule
+\textbf{Period} & \textbf{Work Done} \\
+\midrule
+April (Weeks 1--2) & Project setup, database schema design, authentication (register, login, JWT) \\
+April (Weeks 3--4) & Topic and course structure, prerequisite relationships, seed data \\
+May (Weeks 1--2) & Resource upload, admin review workflow, ratings system \\
+May (Weeks 3--4) & Engagement tracking, recommendation engine (UBCF + Bayesian average) \\
+June (Weeks 1--2) & Onboarding quiz, cold-start fallback, progress tracking, home feed \\
+June (Weeks 3--4) & UI polish, bug fixes, deployment to Render and Vercel, report writing \\
+\bottomrule
+\end{longtable}
+
+The iterative approach also meant that the database schema was informed by real usage patterns observed during development, rather than being designed entirely upfront. The \texttt{version} column on the \texttt{resources} table, for example, was added during the May review phase when it became clear that resource update support would be needed in a future iteration.
+
+\section{Version Control}
+
+Git was used throughout the project with commits grouped by feature. The repository is hosted on GitHub, which also serves as the deployment trigger -- both the backend (Render) and frontend (Vercel) automatically redeploy on every push to the \texttt{main} branch. This created a simple but effective CI/CD pipeline. A GitHub Actions workflow additionally runs the automated test suite on every push, preventing regressions from being merged undetected.
+
+\section{Testing Strategy}
+
+Two layers of testing were applied to verify correctness:
+
+\begin{enumerate}
+  \item \textbf{Automated unit tests:} Written using \texttt{pytest} with \texttt{httpx} for the FastAPI test client. Tests cover authentication flows (registration, login, token validation) and the recommendation algorithm (correct scoring formula, cold-start fallback behaviour).
+  \item \textbf{Manual end-to-end testing:} The deployed system was tested by multiple users across different devices and browsers. Reported issues -- including the CORS middleware ordering bug and the missing React Router entry for \texttt{/topics} -- were resolved before the final submission. These incidents are documented in detail in Chapter 9.
+\end{enumerate}
+
+With the methodology in place, the following chapters describe the architectural and design decisions that resulted from it.
+
+% ============================================================
+% CHAPTER 4 -- SYSTEM ARCHITECTURE
+% ============================================================
+\chapter{System Architecture}
+
+This chapter describes how the Opic system is structured at a high level, how each layer communicates, and where each component is deployed. The architecture was chosen to satisfy NFR-06 (maintainability through separation of concerns) and to allow the frontend and backend to be deployed, scaled, and updated independently.
+
+\section{High-Level Architecture}
+
+Opic follows a classic \textbf{client-server} architecture with a clear separation between the frontend and backend. The frontend is a browser-based single-page application; the backend is a REST API server; and the database is a managed relational store. Figure~\ref{fig:arch} illustrates how these three layers interact.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{arch.png}{\includegraphics[width=0.85\textwidth]{arch.png}}{\missingfig{arch.png}{System Architecture Diagram -- showing React SPA communicating with FastAPI over HTTPS, which in turn reads from and writes to PostgreSQL}}
+\caption{System Architecture Diagram}
+\label{fig:arch}
+\end{figure}
+
+All communication between the frontend and the backend occurs over HTTPS using JSON-encoded REST requests. There is no WebSocket or real-time connection; all state is fetched on demand. This keeps the architecture simple and makes the API straightforwardly testable.
+
+\section{Frontend}
+
+The frontend is a \textbf{React} single-page application (SPA) built with \textbf{Vite}. It communicates with the backend exclusively through REST API calls using \texttt{axios}. React Router v6 handles client-side navigation so that page transitions do not trigger full reloads.
+
+Authentication state (the logged-in user's token and profile) is managed through a React Context provider, making it available to all components without prop drilling. The context is initialised from \texttt{localStorage} on page load, so the session survives browser refreshes.
+
+\section{Backend}
+
+The backend is built with \textbf{FastAPI}, a modern Python web framework that generates interactive OpenAPI documentation automatically at \texttt{/docs}. The application is structured into five layers:
+
+\begin{itemize}
+  \item \texttt{app/api/} -- Route handlers for each feature group (\texttt{auth}, \texttt{topics}, \texttt{resources}, \texttt{recommend}).
+  \item \texttt{app/models/} -- SQLAlchemy ORM models, one file per database table.
+  \item \texttt{app/schemas/} -- Pydantic request and response schemas for input validation and serialisation.
+  \item \texttt{app/services/} -- Business logic, most importantly the recommender service.
+  \item \texttt{app/core/} -- Database connection setup and security utilities (JWT signing, password hashing).
+\end{itemize}
+
+This layered structure ensures that route handlers remain thin and that business logic is reusable and independently testable.
+
+\section{Deployment Architecture}
+
+The system is deployed entirely on free-tier cloud infrastructure. Table~\ref{tab:deploy} summarises each component and the service it runs on.
+
+\begin{longtable}{p{0.2\textwidth} p{0.3\textwidth} p{0.4\textwidth}}
+\caption{Deployment Infrastructure}\label{tab:deploy}\\
+\toprule
+\textbf{Component} & \textbf{Service} & \textbf{Notes} \\
+\midrule
+Frontend & Vercel & Auto-deploys on git push. Static bundle served from CDN. \\
+Backend & Render & Python web service. Persistent process. \\
+Database & Render PostgreSQL & Managed PostgreSQL. Automatic backups. \\
+\bottomrule
+\end{longtable}
+
+The frontend is built as a static bundle and served from Vercel's global CDN. The backend runs as a persistent web service on Render, with CORS configured to only accept requests from the known Vercel domains. This ensures that cross-origin requests from any other source are rejected at the HTTP level. The deployment pipeline is fully automated: a push to the \texttt{main} branch triggers a GitHub Actions CI run, and if tests pass, both Vercel and Render pick up the new commit and redeploy automatically.
+
+With the architecture established, the next chapter describes the database design that underpins it.
+
+% ============================================================
+% CHAPTER 5 -- DATABASE DESIGN
+% ============================================================
+\chapter{Database Design}
+
+This chapter presents the database schema that stores all application data. The schema was designed to support the functional requirements from Chapter 2 while keeping query complexity manageable and enforcing data integrity through database-level constraints. The design consists of nine tables centred on three core entities: \texttt{users}, \texttt{topics}, and \texttt{resources}.
+
+\section{Entity-Relationship Overview}
+
+Figure~\ref{fig:erd} shows the entity-relationship diagram for the complete schema. The diagram illustrates how the nine tables relate to one another through foreign keys and composite primary keys.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{erd.png}{\includegraphics[width=0.9\textwidth]{erd.png}}{\missingfig{erd.png}{Entity-Relationship Diagram showing the nine tables and their relationships}}
+\caption{Entity-Relationship Diagram}
+\label{fig:erd}
+\end{figure}
+
+The three central tables (\texttt{users}, \texttt{topics}, \texttt{resources}) are surrounded by supporting tables that capture interactions between them. The \texttt{ratings} and \texttt{engagements} tables record user-resource interactions. The \texttt{user\_progress} table records user-topic interactions. The \texttt{topic\_prerequisites} table captures topic-topic relationships. The \texttt{onboarding\_questions} and \texttt{onboarding\_answers} tables support the cold-start recommendation flow.
+
+\section{Table Descriptions}
+
+The following subsections describe each table in detail. For each table, the column definitions are followed by a brief explanation of its role in the system.
+
+\subsection{users}
+
+The \texttt{users} table is the foundation of the authentication system. Every action in the platform is associated with a user record, either as the actor (ratings, submissions) or as the target (admin management).
+
+\begin{longtable}{p{0.22\textwidth} p{0.18\textwidth} p{0.5\textwidth}}
+\caption{Table: users}\label{tab:users}\\
+\toprule
+\textbf{Column} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Column} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\endhead
+id & INTEGER (PK) & Auto-incremented primary key \\
+username & VARCHAR & Unique display name \\
+email & VARCHAR & Unique email address used for login \\
+hashed\_password & VARCHAR & bcrypt-hashed password, never stored in plain text \\
+is\_admin & BOOLEAN & If true, user has admin privileges \\
+created\_at & DATETIME & Account creation timestamp \\
+\bottomrule
+\end{longtable}
+
+The \texttt{is\_admin} boolean is a simple but effective role flag. Its main limitation -- the absence of intermediate roles -- is acknowledged in Chapter 9.
+
+\subsection{topics}
+
+The \texttt{topics} table defines the learning map. Each topic belongs to a logical course grouping encoded in the title field.
+
+\begin{longtable}{p{0.22\textwidth} p{0.18\textwidth} p{0.5\textwidth}}
+\caption{Table: topics}\label{tab:topics}\\
+\toprule
+\textbf{Column} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Column} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\endhead
+id & INTEGER (PK) & Auto-incremented primary key \\
+title & VARCHAR & Topic title (format: ``Course: Topic'') \\
+description & TEXT & Short explanation of what the topic covers \\
+order\_index & INTEGER & Display order within a course \\
+\bottomrule
+\end{longtable}
+
+\subsection{topic\_prerequisites}
+
+This junction table encodes directed prerequisite relationships between topics. The \texttt{is\_hard} flag distinguishes mandatory prerequisites from suggested ones, enabling future UI differentiation.
+
+\begin{longtable}{p{0.22\textwidth} p{0.18\textwidth} p{0.5\textwidth}}
+\caption{Table: topic\_prerequisites}\label{tab:prereqs}\\
+\toprule
+\textbf{Column} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Column} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\endhead
+topic\_id & INTEGER (PK, FK) & The topic that has the requirement \\
+prereq\_id & INTEGER (PK, FK) & The topic that must be completed first \\
+is\_hard & BOOLEAN & True = mandatory prerequisite; False = suggested only \\
+\bottomrule
+\end{longtable}
+
+\subsection{resources}
+
+The \texttt{resources} table is at the centre of the content pipeline. The \texttt{status} column gates which resources are visible to learners; only \texttt{approved} resources are returned by the topic detail endpoint.
+
+\begin{longtable}{p{0.22\textwidth} p{0.18\textwidth} p{0.5\textwidth}}
+\caption{Table: resources}\label{tab:resources}\\
+\toprule
+\textbf{Column} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Column} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\endhead
+id & INTEGER (PK) & Auto-incremented primary key \\
+topic\_id & INTEGER (FK) & The topic this resource belongs to \\
+uploader\_id & INTEGER (FK) & The user who submitted this resource \\
+title & VARCHAR & Resource title (max 200 characters) \\
+url & VARCHAR & Full URL (must be http or https) \\
+resource\_type & VARCHAR & Either \texttt{video} or \texttt{article} \\
+status & ENUM & One of: \texttt{pending}, \texttt{approved}, \texttt{rejected} \\
+version & INTEGER & Reserved for future update support \\
+created\_at & DATETIME & Submission timestamp \\
+\bottomrule
+\end{longtable}
+
+\subsection{ratings}
+
+The \texttt{ratings} table records each user's explicit feedback on a resource. It feeds directly into the recommendation engine's user-resource matrix.
+
+\begin{longtable}{p{0.22\textwidth} p{0.18\textwidth} p{0.5\textwidth}}
+\caption{Table: ratings}\label{tab:ratings}\\
+\toprule
+\textbf{Column} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Column} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\endhead
+user\_id & INTEGER (PK, FK) & The user who gave the rating \\
+resource\_id & INTEGER (PK, FK) & The resource being rated \\
+stars & INTEGER & Rating value from 1 to 5 \\
+reason & VARCHAR & Optional feedback text for low ratings (1--2 stars) \\
+\bottomrule
+\end{longtable}
+
+The composite primary key \texttt{(user\_id, resource\_id)} enforces one rating per user per resource. Submitting a new rating for the same resource updates the existing row rather than creating a duplicate.
+
+\subsection{engagements}
+
+The \texttt{engagements} table captures implicit feedback signals that supplement the explicit star ratings. These signals are combined with the star rating to produce the weighted engagement score used in the recommendation engine (see Chapter 6).
+
+\begin{longtable}{p{0.22\textwidth} p{0.18\textwidth} p{0.5\textwidth}}
+\caption{Table: engagements}\label{tab:engagements}\\
+\toprule
+\textbf{Column} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Column} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\endhead
+id & INTEGER (PK) & Auto-incremented primary key \\
+user\_id & INTEGER (FK) & The user whose engagement is tracked \\
+resource\_id & INTEGER (FK) & The resource being engaged with \\
+watch\_completion & FLOAT & Ratio 0.0--1.0 of how much was watched/read \\
+revisit\_count & INTEGER & Number of times the user returned to this resource \\
+completed & BOOLEAN & Whether the user marked this resource as done \\
+time\_spent & INTEGER & Total seconds spent on the resource \\
+completed\_at & DATETIME & Timestamp when the user first marked it complete \\
+\bottomrule
+\end{longtable}
+
+\subsection{user\_progress}
+
+The \texttt{user\_progress} table tracks topic-level completion, which is distinct from resource-level engagement. A user can mark a topic as complete even if they have not interacted with every resource under it.
+
+\begin{longtable}{p{0.22\textwidth} p{0.18\textwidth} p{0.5\textwidth}}
+\caption{Table: user\_progress}\label{tab:progress}\\
+\toprule
+\textbf{Column} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Column} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\endhead
+user\_id & INTEGER (PK, FK) & The user tracking progress \\
+topic\_id & INTEGER (PK, FK) & The topic being tracked \\
+completed & BOOLEAN & Whether the topic is marked as completed \\
+last\_accessed & DATETIME & Last time the user visited this topic \\
+\bottomrule
+\end{longtable}
+
+\subsection{onboarding\_questions and onboarding\_answers}
+
+These two tables together support the cold-start recommendation fallback. Each question is linked to a topic; a positive answer boosts that topic's resources during the initial recommendation pass for a new user with no ratings.
+
+\begin{longtable}{p{0.22\textwidth} p{0.18\textwidth} p{0.5\textwidth}}
+\caption{Table: onboarding\_questions}\label{tab:oq}\\
+\toprule
+\textbf{Column} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Column} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\endhead
+id & INTEGER (PK) & Auto-incremented primary key \\
+question & TEXT & The question text shown to the user \\
+topic\_id & INTEGER (FK) & Maps this question to a topic for cold-start boosting \\
+\bottomrule
+\end{longtable}
+
+\begin{longtable}{p{0.22\textwidth} p{0.18\textwidth} p{0.5\textwidth}}
+\caption{Table: onboarding\_answers}\label{tab:oa}\\
+\toprule
+\textbf{Column} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Column} & \textbf{Type} & \textbf{Description} \\
+\midrule
+\endhead
+id & INTEGER (PK) & Auto-incremented primary key \\
+user\_id & INTEGER (FK) & The user who answered \\
+question\_id & INTEGER (FK) & The question being answered \\
+answer & VARCHAR & Free-text answer; answers containing negative words (no, never, don't) are excluded from boosting \\
+\bottomrule
+\end{longtable}
+
+\section{Key Design Decisions}
+
+Several non-obvious choices were made during schema design. The rationale for the most important ones is summarised below:
+
+\begin{itemize}
+  \item \textbf{Composite primary keys} on \texttt{ratings} and \texttt{user\_progress} prevent duplicate rows naturally without requiring application-level uniqueness checks.
+  \item \textbf{Indexed columns:} \texttt{(topic\_id, status)} on resources and \texttt{(user\_id, completed)} on engagements speed up the most frequent queries (fetching approved resources for a topic, and building the recommendation matrix).
+  \item \textbf{Soft/hard prerequisites:} The \texttt{is\_hard} boolean distinguishes mandatory prerequisites from suggested ones, allowing the UI to differentiate them in a future iteration.
+  \item \textbf{Resource versioning:} The \texttt{version} column was included for future support of resource updates without losing rating history. It is not yet used by the current implementation.
+  \item \textbf{Rating computed at query time:} Rather than storing a pre-computed average, the overall rating is calculated from the \texttt{ratings} table on each request. This ensures the displayed value is always accurate immediately after any new rating is submitted, without requiring a background synchronisation job.
+\end{itemize}
+
+With the schema defined, the next chapter walks through how each use case is implemented on top of it.
+
+% ============================================================
+% CHAPTER 6 -- USE CASE IMPLEMENTATION
+% ============================================================
+\chapter{Use Case Implementation}
+
+This chapter describes how each use case identified in Chapter 2 was implemented. For each group of related use cases, a sequence diagram illustrates the interaction flow between the browser, the React frontend, the FastAPI backend, and the database. Code excerpts are included where the implementation is non-trivial or academically significant.
+
+\section{Use Case Implementation Overview}
+
+Before examining each use case individually, Table~\ref{tab:uc-impl-summary} provides a consolidated view of all use cases, the main endpoint they invoke, and the section in this chapter where they are detailed.
+
+\begin{longtable}{p{0.12\textwidth} p{0.28\textwidth} p{0.30\textwidth} p{0.18\textwidth}}
+\caption{Use Case Implementation Summary}\label{tab:uc-impl-summary}\\
+\toprule
+\textbf{ID} & \textbf{Name} & \textbf{Main Endpoint} & \textbf{Section} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{ID} & \textbf{Name} & \textbf{Main Endpoint} & \textbf{Section} \\
+\midrule
+\endhead
+UC-01 & Register Account & \texttt{POST /auth/register} & \ref{sec:impl-auth} \\
+UC-02 & Log In & \texttt{POST /auth/login} & \ref{sec:impl-auth} \\
+UC-03 & Reset Password & \texttt{POST /auth/reset-password} & \ref{sec:impl-auth} \\
+UC-04 & Rate a Resource & \texttt{POST /resources/\{id\}/rate} & \ref{sec:impl-resources} \\
+UC-05 & Submit a Resource & \texttt{POST /resources/} & \ref{sec:impl-resources} \\
+UC-06 & Track Topic Progress & \texttt{POST /topics/\{id\}/progress} & \ref{sec:impl-progress} \\
+UC-07 & View Recommendations & \texttt{GET /recommend/\{user\_id\}} & \ref{sec:impl-rec} \\
+UC-08 & Admin Review Submission & \texttt{POST /resources/\{id\}/review} & \ref{sec:impl-adminreview} \\
+UC-09 & Manage Users & \texttt{GET /auth/users}, \texttt{DELETE /auth/users/\{id\}} & \ref{sec:impl-adminreview} \\
+UC-10 & Complete Onboarding Quiz & \texttt{POST /auth/onboarding} & \ref{sec:impl-auth} \\
+\bottomrule
+\end{longtable}
+
+The sections that follow examine each group in turn, starting with authentication.
+
+\section{Authentication}
+\label{sec:impl-auth}
+
+Authentication covers three use cases: registration (UC-01), login (UC-02), and password reset (UC-03), as well as the onboarding quiz (UC-10) that runs immediately after registration. Together these use cases define the security boundary for the entire system.
+
+\subsection{Register Sequence}
+
+Figure~\ref{fig:seq-register} shows the sequence when a new user creates an account. The backend hashes the password with bcrypt before writing to the database -- the plain-text password never touches persistent storage.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{seq_register.png}{\includegraphics[width=0.75\textwidth]{seq_register.png}}{\missingfig{seq\_register.png}{Sequence Diagram -- User Registration: Browser → React → POST /auth/register → bcrypt hash → DB insert → return 201}}
+\caption{Sequence Diagram -- User Registration}
+\label{fig:seq-register}
+\end{figure}
+
+\subsection{Login Sequence}
+
+Figure~\ref{fig:seq-login} shows the events when a user logs in. On success, the server generates a signed JWT containing the user's ID and \texttt{is\_admin} flag. The token is stored in \texttt{localStorage} by the frontend and attached to every subsequent request in the \texttt{Authorization: Bearer} header.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{seq_login.png}{\includegraphics[width=0.75\textwidth]{seq_login.png}}{\missingfig{seq\_login.png}{Sequence Diagram -- User Login: Browser → React → POST /auth/login → bcrypt verify → JWT sign → return token}}
+\caption{Sequence Diagram -- User Login}
+\label{fig:seq-login}
+\end{figure}
+
+Passwords are verified using the \texttt{passlib} library with the bcrypt scheme. A separate password reset flow (UC-03) sends a 6-character alphanumeric code with a 10-minute expiry to the user's registered email address.
+
+\section{Resource Management}
+\label{sec:impl-resources}
+
+Resource management covers the submission (UC-05), rating (UC-04), and admin review (UC-08) use cases. These three flows together define the full content lifecycle on the platform.
+
+\subsection{Resource Submission Sequence}
+
+Figure~\ref{fig:seq-submit} shows how a learner submits a resource for review. The resource is created with \texttt{status = pending} and is not visible to other learners until an admin approves it.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{seq_submit.png}{\includegraphics[width=0.75\textwidth]{seq_submit.png}}{\missingfig{seq\_submit.png}{Sequence Diagram -- Resource Submission: learner POSTs resource → saved as pending → not visible until approved}}
+\caption{Sequence Diagram -- Resource Submission}
+\label{fig:seq-submit}
+\end{figure}
+
+\subsection{Admin Review Sequence}
+
+Figure~\ref{fig:seq-review} shows the flow from submission to admin approval. When the admin calls the review endpoint with \texttt{approved=true}, the resource status is updated to \texttt{approved} and becomes visible on the topic detail page for all learners.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{seq_review.png}{\includegraphics[width=0.75\textwidth]{seq_review.png}}{\missingfig{seq\_review.png}{Sequence Diagram -- Resource Submission and Admin Review: admin approves or rejects pending submission}}
+\caption{Sequence Diagram -- Resource Submission and Admin Review}
+\label{fig:seq-review}
+\end{figure}
+
+\subsection{Rating Sequence}
+
+Figure~\ref{fig:seq-rating} shows how a user rates a resource. When a rating is submitted, the system upserts the rating row (creating it if this is the user's first rating for this resource, or updating it otherwise) and returns the updated overall Bayesian average rating for that resource.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{seq_rating.png}{\includegraphics[width=0.75\textwidth]{seq_rating.png}}{\missingfig{seq\_rating.png}{Sequence Diagram -- Resource Rating: user submits stars → upsert rating row → compute Bayesian average → return updated score}}
+\caption{Sequence Diagram -- Resource Rating with Overall Rating Update}
+\label{fig:seq-rating}
+\end{figure}
+
+\section{Progress Tracking}
+\label{sec:impl-progress}
+
+Progress tracking (UC-06) is implemented at two levels. At the resource level, engagement data is recorded automatically when a user interacts with a resource. At the topic level, a user can manually mark a topic as done, which triggers an upsert on the \texttt{user\_progress} table.
+
+\subsection{Topic Progress Sequence}
+
+Figure~\ref{fig:seq-progress} shows how a user marks a topic as completed. The progress page also aggregates this data to show a 30-day activity heatmap, total resources completed, topics finished, and total time spent.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{seq_progress.png}{\includegraphics[width=0.75\textwidth]{seq_progress.png}}{\missingfig{seq\_progress.png}{Sequence Diagram -- Topic Progress Tracking: user clicks complete → POST /topics/\{id\}/progress → upsert user\_progress}}
+\caption{Sequence Diagram -- Topic Progress Tracking}
+\label{fig:seq-progress}
+\end{figure}
+
+\section{Recommendation Engine}
+\label{sec:impl-rec}
+
+The recommendation engine is the core academic contribution of this project. It combines two complementary approaches to handle both active users and cold-start users.
+
+\subsection{Recommendation Sequence}
+
+Figure~\ref{fig:seq-rec} shows how recommendations are generated when a user opens a topic page or the home feed. The engine runs synchronously on each request, building the user-resource matrix from live data.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{seq_rec.png}{\includegraphics[width=0.85\textwidth]{seq_rec.png}}{\missingfig{seq\_rec.png}{Sequence Diagram -- Recommendation Generation: GET /recommend/\{id\} → build matrix → cosine similarity → rank → return top-N}}
+\caption{Sequence Diagram -- Recommendation Generation}
+\label{fig:seq-rec}
+\end{figure}
+
+\subsection{User-Based Collaborative Filtering (UBCF)}
+
+For users who have rated at least one resource, the system builds a user-resource matrix where each cell represents a weighted engagement score that combines explicit ratings with implicit engagement signals:
+
+\begin{equation}
+  \text{score} = 0.35 \cdot \frac{\text{stars}}{5} + 0.25 \cdot w_{\text{watch}} + 0.20 \cdot \frac{\min(t, 600)}{600} + 0.10 \cdot r_{\text{revisit}} + 0.10 \cdot c_{\text{complete}}
+\end{equation}
+
+where $w_{\text{watch}}$ is the watch completion ratio (0--1), $t$ is time spent in seconds capped at 600, $r_{\text{revisit}}$ is a normalised revisit count, and $c_{\text{complete}}$ is 1 if the resource was marked complete. The weights were set to reflect the relative reliability of each signal: explicit star ratings carry the most weight (35\%), while completion and revisit signals serve as supporting evidence.
+
+Cosine similarity is then computed between the target user's row vector and every other user's row:
+
+\begin{equation}
+  \text{sim}(u, v) = \frac{\mathbf{u} \cdot \mathbf{v}}{\|\mathbf{u}\| \cdot \|\mathbf{v}\|}
+\end{equation}
+
+The predicted score for a candidate resource $r$ not yet seen by user $u$ is a weighted combination of the collaborative score and a popularity baseline:
+
+\begin{equation}
+  \hat{s}(u, r) = 0.6 \cdot \frac{\sum_{v \neq u} \text{sim}(u,v) \cdot s(v,r)}{\sum_{v \neq u} |\text{sim}(u,v)|} + 0.4 \cdot p_r
+\end{equation}
+
+where $p_r$ is the Bayesian average popularity score of the resource. The 60/40 split between collaborative and popularity scores prevents the engine from over-fitting to a small number of similar users.
+
+\subsection{Bayesian Average for Popularity}
+
+To avoid the cold-resource problem (new resources with very few ratings appearing unrealistically high or low in rankings), a Bayesian average is used as the popularity baseline:
+
+\begin{equation}
+  \bar{r}_{\text{Bayes}} = \frac{m \cdot C + \sum_{i} r_i}{m + n}
+\end{equation}
+
+where $m = 5$ is the prior count, $C = 3.0$ is the prior mean rating, $n$ is the number of actual ratings, and $r_i$ are the individual star ratings. With these values, a resource with only one 5-star rating receives a Bayesian average of $\frac{5 \times 3 + 5}{5 + 1} \approx 3.33$ rather than 5.0, preventing it from dominating the ranking until it has collected sufficient evidence.
+
+\subsection{Cold-Start Fallback}
+
+When a new user has no ratings, cosine similarity cannot be computed. The system falls back to the Bayesian popularity ranking and boosts resources whose topics match the user's onboarding quiz answers:
+
+\begin{lstlisting}[language=Python, caption=Cold-start topic boosting]
+if resource.topic_id in boosted_topics:
+    base_score += 1.5
+\end{lstlisting}
+
+Topics are only boosted if the user gave a positive answer to the corresponding onboarding question. Answers containing negative words (\texttt{no}, \texttt{never}, \texttt{don't}) are excluded from the boost set to avoid recommending content the user explicitly said they are not interested in.
+
+\section{AI Knowledge Quiz}
+\label{sec:impl-quiz}
+
+When a user clicks ``Mark Complete'' on a topic (UC-11), the system calls the \texttt{GET /topics/\{id\}/quiz} endpoint, which uses the \textbf{Google Gemini 2.0 Flash} API to generate five multiple choice questions tailored to the topic's title and description. The quiz is shown in a modal before the topic is recorded as complete in the database.
+
+\subsection{Quiz Flow}
+
+The quiz presents one question at a time. The user selects one of four options (A--D) and clicks Confirm to reveal whether their answer was correct (highlighted green) or wrong (highlighted red with the correct answer also shown in green). A running wrong-answer counter is visible in the modal header. If the user accumulates \textbf{three or more incorrect answers}, the quiz ends with a retry screen prompting them to review the material and attempt the quiz again. If they pass (fewer than three wrong), a score summary is shown and a ``Mark as Complete'' button finalises the topic completion. A ``Skip quiz'' button is always available for users who wish to bypass the assessment.
+
+\subsection{Gemini Integration}
+
+The backend sends a structured prompt to the Gemini API requesting five topic-specific multiple choice questions with plausible distractors and varied correct-answer positions. If the Gemini API is unavailable or returns malformed JSON, the endpoint falls back to locally-generated questions derived from the topic title and description. This ensures the quiz always appears and never blocks topic completion, satisfying FR-15.
+
+\section{Admin Review Workflow}
+\label{sec:impl-adminreview}
+
+Resources submitted by users enter a \texttt{pending} state and are invisible to other learners. The admin review page (UC-08) lists all pending submissions, showing each resource's title, URL, submitter, and associated topic. An admin can approve or reject each submission by clicking the corresponding button. Only approved resources appear in topic pages.
+
+The admin user management page (UC-09) lists all registered accounts. Admins can delete any non-admin account. A guard condition in the delete endpoint prevents accidental removal of admin accounts -- attempting to delete an admin account returns HTTP 403 with a descriptive error message.
+
+\section{Summary}
+
+This chapter has shown how each of the eleven use cases is realised through a combination of frontend pages, REST API endpoints, and database operations. The most technically complex components are the recommendation engine and the AI knowledge quiz. The recommendation engine requires non-trivial matrix computation; the quiz integrates an external generative AI API with a robust fallback strategy. The next chapter lists the complete set of tools and libraries that were used to build the system.
+
+% ============================================================
+% CHAPTER 7 -- TOOLS AND TECHNIQUES
+% ============================================================
+\chapter{Tools and Techniques}
+
+This chapter lists the complete set of libraries, frameworks, and external services used to build and deploy Opic. Each entry is accompanied by the category it belongs to and the specific role it played in the project. The selection criteria across all categories were: active maintenance, strong documentation, and suitability for a Python/React stack on free-tier cloud infrastructure.
+
+Table~\ref{tab:tools} provides the full inventory.
+
+\begin{longtable}{p{0.25\textwidth} p{0.2\textwidth} p{0.45\textwidth}}
+\caption{Tools and Libraries}\label{tab:tools}\\
+\toprule
+\textbf{Tool} & \textbf{Category} & \textbf{Purpose} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Tool} & \textbf{Category} & \textbf{Purpose} \\
+\midrule
+\endhead
+React 18 & Frontend framework & Component-based UI, SPA routing \\
+Vite & Build tool & Fast dev server, optimised production build \\
+React Router v6 & Routing & Client-side navigation without page reloads \\
+Axios & HTTP client & API communication with interceptors for auth token \\
+Framer Motion & Animation & Subtle entrance animations on the home page \\
+FastAPI & Backend framework & REST API with automatic OpenAPI docs \\
+SQLAlchemy & ORM & Database models and query abstraction \\
+Pydantic & Validation & Request body validation and response serialisation \\
+python-jose & JWT & Token generation and verification \\
+passlib/bcrypt & Security & Password hashing \\
+NumPy & Numerical computing & Matrix operations for cosine similarity \\
+scikit-learn & ML utilities & Vector normalisation \\
+PostgreSQL & Database & Production relational database \\
+SQLite & Database & Development and testing database \\
+pytest + httpx & Testing & Automated API tests \\
+Google Gemini API & AI & Generative AI for topic knowledge quiz question generation \\
+Docker Compose & Containerisation & Local full-stack development environment \\
+Render & Cloud hosting & Backend and database deployment \\
+Vercel & CDN/hosting & Frontend deployment \\
+GitHub Actions & CI & Automated test run on every push \\
+\bottomrule
+\end{longtable}
+
+The most notable dependency choices are \textbf{FastAPI} over Flask (for automatic OpenAPI generation and native Pydantic integration), \textbf{SQLAlchemy} over a raw SQL approach (for type-safe ORM models and database-agnostic queries), and \textbf{NumPy} for the recommendation matrix operations (for vectorised cosine similarity without writing low-level loops). All dependencies are pinned to specific versions in \texttt{requirements.txt} to ensure reproducible builds across development and production environments.
+
+% ============================================================
+% CHAPTER 8 -- RESULTS AND DISCUSSION
+% ============================================================
+\chapter{Results and Discussion}
+
+This chapter evaluates the Opic platform against the requirements defined in Chapter 2. Section~\ref{sec:results-func} confirms the implementation status of all functional requirements. Section~\ref{sec:results-ui} analyses the key screens of the deployed interface. Section~\ref{sec:results-eval} discusses the system-level evaluation, including the recommendation quality test. Section~\ref{sec:results-bugs} documents the significant bugs discovered and resolved during the evaluation phase.
+
+\section{Functional Outcomes}
+\label{sec:results-func}
+
+All fourteen functional requirements listed in Chapter 2 were implemented and verified on the live deployment at \url{https://final-project-git-main-lamawds-projects.vercel.app}. Table~\ref{tab:results} summarises the implementation status of each requirement.
+
+\begin{longtable}{p{0.1\textwidth} p{0.5\textwidth} p{0.25\textwidth}}
+\caption{Functional Requirements Implementation Status}\label{tab:results}\\
+\toprule
+\textbf{ID} & \textbf{Requirement} & \textbf{Status} \\
+\midrule
+FR-01 & User Registration & \textcolor{green!60!black}{Implemented} \\
+FR-02 & User Login & \textcolor{green!60!black}{Implemented} \\
+FR-03 & Password Reset & \textcolor{green!60!black}{Implemented} \\
+FR-04 & Topic Browsing & \textcolor{green!60!black}{Implemented} \\
+FR-05 & Resource Access & \textcolor{green!60!black}{Implemented} \\
+FR-06 & Resource Submission & \textcolor{green!60!black}{Implemented} \\
+FR-07 & Resource Rating & \textcolor{green!60!black}{Implemented} \\
+FR-08 & Engagement Tracking & \textcolor{green!60!black}{Implemented} \\
+FR-09 & Topic Progress & \textcolor{green!60!black}{Implemented} \\
+FR-10 & Onboarding Quiz & \textcolor{green!60!black}{Implemented} \\
+FR-11 & Recommendations & \textcolor{green!60!black}{Implemented} \\
+FR-12 & Admin Review & \textcolor{green!60!black}{Implemented} \\
+FR-13 & Admin User Management & \textcolor{green!60!black}{Implemented} \\
+FR-14 & Home Feed & \textcolor{green!60!black}{Implemented} \\
+FR-15 & AI Knowledge Quiz & \textcolor{green!60!black}{Implemented} \\
+\bottomrule
+\end{longtable}
+
+The table confirms a 100\% implementation rate across all requirements. The following sections provide evidence for this claim through UI screenshots and a discussion of the recommendation quality test.
+
+\section{User Interface Analysis}
+\label{sec:results-ui}
+
+This section presents screenshots of the main screens of the deployed platform and analyses how each screen satisfies its corresponding functional requirements.
+
+\subsection{Login and Register}
+
+Figure~\ref{fig:ui-login} shows the login page. The form provides specific, per-field error messages: if the email is not found in the system, the message reads ``No account found with that email''; if the password is wrong, it reads ``Incorrect password''. The register page similarly validates each field inline before hitting the server.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{ui_login.png}{\includegraphics[width=0.85\textwidth]{ui_login.png}}{\missingfig{ui\_login.png}{Screenshot of the login page with hero branding and per-field error messages}}
+\caption{Login Page -- Authentication with Specific Error Messages (FR-02)}
+\label{fig:ui-login}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\IfFileExists{ui_register.png}{\includegraphics[width=0.85\textwidth]{ui_register.png}}{\missingfig{ui\_register.png}{Screenshot of the registration page with per-field validation}}
+\caption{Registration Page -- Account Creation with Inline Validation (FR-01)}
+\label{fig:ui-register}
+\end{figure}
+
+\subsection{AI Knowledge Quiz}
+
+Figure~\ref{fig:ui-quiz} shows the AI-generated knowledge quiz modal that appears when a user clicks ``Mark Complete'' on a topic. The quiz presents five multiple choice questions generated by the Gemini API, one at a time. Correct answers are highlighted in green and wrong answers in red. If the user gets three or more questions wrong, they are prompted to retry (FR-15).
+
+\begin{figure}[H]
+\centering
+\IfFileExists{ui_topic.png}{\includegraphics[width=0.85\textwidth]{ui_topic.png}}{\missingfig{ui\_topic.png}{Screenshot of the AI knowledge quiz modal showing a multiple choice question with colour-coded feedback}}
+\caption{AI Knowledge Quiz -- Topic Completion Assessment (FR-15)}
+\label{fig:ui-quiz}
+\end{figure}
+
+\subsection{Suggested Resources}
+
+Figure~\ref{fig:ui-suggested} shows the personalised resource suggestions section on the topic detail page. Resources are ranked by the recommendation engine score and displayed below the topic's own resource list.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{ui_sugested.png}{\includegraphics[width=0.85\textwidth]{ui_sugested.png}}{\missingfig{ui\_sugested.png}{Screenshot of suggested resources section on the topic detail page}}
+\caption{Suggested Resources -- Collaborative Filtering Recommendations (FR-11)}
+\label{fig:ui-suggested}
+\end{figure}
+
+\subsection{Home Feed}
+
+Figure~\ref{fig:ui-home} shows the home feed page. The page is divided into two sections: a personalised ``Picks for You'' section (FR-11, FR-14) that shows the top recommended resources based on the user's interaction history, and a ``Featured This Week'' section that highlights a manually curated resource. For new users, the picks section is populated by the cold-start fallback using onboarding quiz answers (FR-10).
+
+\begin{figure}[H]
+\centering
+\IfFileExists{ui_home1.png}{\includegraphics[width=0.9\textwidth]{ui_home1.png}}{\missingfig{ui\_home1.png}{Screenshot of the Opic home feed page showing personalised recommendations and featured video}}
+\caption{Home Feed -- Personalised Recommendations (FR-11, FR-14)}
+\label{fig:ui-home}
+\end{figure}
+
+\subsection{Topic List and Topic Detail}
+
+Figure~\ref{fig:ui-topics} shows the topic list page, where all topics are grouped by course and displayed in order. Prerequisite relationships are visible as dependency indicators, addressing FR-04.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{ui_courses.png}{\includegraphics[width=0.9\textwidth]{ui_courses.png}}{\missingfig{ui\_courses.png}{Screenshot of the topic list page showing topics grouped by course with prerequisite indicators}}
+\caption{Topic List Page -- Structured Learning Roadmap (FR-04)}
+\label{fig:ui-topics}
+\end{figure}
+
+Figure~\ref{fig:ui-topic-detail} shows the topic detail page. The page lists all approved resources for the selected topic (FR-05), each with a star rating widget (FR-07) and an engagement tracking button. A ``Mark as Complete'' button at the top allows the user to update their progress (FR-09).
+
+\begin{figure}[H]
+\centering
+\IfFileExists{ui_topic_details.png}{\includegraphics[width=0.9\textwidth]{ui_topic_details.png}}{\missingfig{ui\_topic\_details.png}{Screenshot of the topic detail page showing approved resources with star ratings and mark-complete button}}
+\caption{Topic Detail Page -- Resources, Ratings, and Progress (FR-05, FR-07, FR-09)}
+\label{fig:ui-topic-detail}
+\end{figure}
+
+\subsection{Resource Submission and Admin Review}
+
+Figure~\ref{fig:ui-submit} shows the resource submission form that any logged-in user can access from a topic detail page. The form requires a title, URL, and resource type (video or article), satisfying FR-06.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{ui_submit1.png}{\includegraphics[width=0.75\textwidth]{ui_submit1.png}}{\missingfig{ui\_submit1.png}{Screenshot of the resource submission form with title, URL, and type fields}}
+\caption{Resource Submission Form (FR-06)}
+\label{fig:ui-submit}
+\end{figure}
+
+Figure~\ref{fig:ui-admin-review} shows the admin review page. Each pending submission is displayed with its title, URL, submitter username, and associated topic. The Approve and Reject buttons trigger the review endpoint (FR-12).
+
+\begin{figure}[H]
+\centering
+\IfFileExists{ui_admin_review.png}{\includegraphics[width=0.9\textwidth]{ui_admin_review.png}}{\missingfig{ui\_admin\_review.png}{Screenshot of the admin review page listing pending submissions with approve/reject buttons}}
+\caption{Admin Review Page -- Content Moderation (FR-12)}
+\label{fig:ui-admin-review}
+\end{figure}
+
+\subsection{Progress Tracking}
+
+Figure~\ref{fig:ui-progress} shows the progress page, which displays a 30-day activity heatmap, total resources completed, topics finished, and total time spent learning. This page addresses FR-09 and FR-08 by surfacing the engagement data collected in the background.
+
+\begin{figure}[H]
+\centering
+\IfFileExists{ui_progress.png}{\includegraphics[width=0.9\textwidth]{ui_progress.png}}{\missingfig{ui\_progress.png}{Screenshot of the progress page with 30-day heatmap, completed topics count, and total time spent}}
+\caption{Progress Tracking Page -- Learning Activity Dashboard (FR-08, FR-09)}
+\label{fig:ui-progress}
+\end{figure}
+
+\subsection{Onboarding Quiz}
+
+Figure~\ref{fig:ui-onboarding} shows the onboarding quiz screen that appears immediately after a new user registers. The quiz presents questions linked to topics; positive answers are used to seed the cold-start recommendation fallback (FR-10).
+
+\begin{figure}[H]
+\centering
+\IfFileExists{ui_onboarding.png}{\includegraphics[width=0.75\textwidth]{ui_onboarding.png}}{\missingfig{ui\_onboarding.png}{Screenshot of the onboarding quiz screen with topic-linked questions}}
+\caption{Onboarding Quiz -- Cold-Start Seeding (FR-10)}
+\label{fig:ui-onboarding}
+\end{figure}
+
+\section{System Evaluation}
+\label{sec:results-eval}
+
+\subsection{Recommendation Quality}
+
+To verify the recommendation engine, two test accounts were created with deliberately different interaction histories. Each account rated five resources in different topic areas. After these interactions, the two accounts received noticeably different sets of recommendations, confirming that the collaborative filtering component correctly differentiates users based on their behaviour.
+
+For a brand-new account with no ratings, the system correctly fell back to popularity-based ranking boosted by onboarding quiz answers, confirming that the cold-start handling works as designed.
+
+The Bayesian average formula also behaved correctly: resources with only one or two ratings did not rank unrealistically high or low, as the prior mean of 3.0 pulled extreme values toward the centre until sufficient ratings were collected.
+
+\subsection{Non-Functional Requirements}
+
+The non-functional requirements from Chapter 2 were evaluated as follows:
+
+\begin{itemize}
+  \item \textbf{NFR-01/NFR-02 (Security):} Verified by inspecting the database -- passwords are stored as bcrypt hashes. Unauthenticated requests to protected endpoints return HTTP 401. Requests to admin endpoints from non-admin users return HTTP 403.
+  \item \textbf{NFR-03 (Performance):} API response times for non-recommendation endpoints were measured at under 200\,ms for typical payloads on the Render free tier, meeting the 300\,ms target.
+  \item \textbf{NFR-04 (Usability):} The platform was tested on desktop Chrome, mobile Safari, and mobile Chrome. All core flows were functional on all three.
+  \item \textbf{NFR-06 (Maintainability):} The frontend was updated and redeployed independently of the backend on multiple occasions during the project, confirming the separation of deployable units.
+  \item \textbf{NFR-08 (CORS):} Requests from origins not in the Vercel allowlist are rejected at the API level. This was verified by sending test requests from a localhost origin not in the allowlist.
+\end{itemize}
+
+\section{Bugs Discovered and Resolved}
+\label{sec:results-bugs}
+
+Two notable bugs were discovered during the evaluation phase and resolved before the final submission:
+
+\begin{itemize}
+  \item \textbf{CORS preflight failure in production:} FastAPI processes middleware in reverse registration order. The custom logging middleware was registered after \texttt{CORSMiddleware}, causing it to execute first and return error responses before CORS headers could be attached. This was fixed by reordering middleware registration so that \texttt{CORSMiddleware} runs outermost. The bug only appeared in the deployed environment because the development server does not enforce the same CORS origin restrictions.
+  \item \textbf{Missing \texttt{/topics} route:} After onboarding quiz completion, the frontend redirected to \texttt{/topics}, but this route was never registered in the React Router configuration. The \texttt{Topics} component existed but was disconnected. This was caught during user testing and fixed by adding the route to \texttt{App.jsx}.
+\end{itemize}
+
+Both bugs were caught through manual end-to-end testing on the live deployment, highlighting the value of testing the deployed system rather than relying solely on automated tests in a local environment.
+
+% ============================================================
+% CHAPTER 9 -- CHALLENGES AND LIMITATIONS
+% ============================================================
+\chapter{Challenges and Limitations}
+
+This chapter reflects honestly on the difficulties encountered during development and the known limitations of the current implementation. Understanding these constraints is important for anyone who wishes to extend or maintain the system.
+
+\section{Challenges Encountered}
+
+\textbf{CORS middleware ordering.} One of the more frustrating bugs during deployment was a CORS error that only appeared in production. As described in Chapter 8, the root cause was that FastAPI processes middleware in reverse registration order. The fix -- reordering the middleware registration -- took less than a minute to implement once the cause was understood; the difficulty lay entirely in diagnosing it without helpful error messages.
+
+\textbf{Missing route.} After deployment, the onboarding quiz redirected to \texttt{/topics}, but this route was never added to the React Router configuration. The \texttt{Topics} component existed but was not connected. This was a simple oversight caught during user testing.
+
+\textbf{Cold-start problem.} New users with no ratings cannot benefit from collaborative filtering. The onboarding quiz partially addresses this by providing topic-level preference signals, but the quality of cold-start recommendations is still lower than for active users. This is a known and accepted limitation of user-based collaborative filtering systems.
+
+\textbf{Render free tier spin-down.} The Render free tier spins down the backend after 15 minutes of inactivity. The first request after a period of no activity can take 30--60 seconds while the service wakes up. This is not ideal for a live demonstration and would need a paid tier to resolve in a production setting.
+
+\section{Limitations}
+
+The current implementation has several known limitations that were intentionally deferred to future work:
+
+\begin{itemize}
+  \item \textbf{No email notifications for review decisions:} When a resource is approved or rejected, the submitter is not automatically notified. Users must check the ``My Submissions'' section of their profile manually. The SMTP infrastructure for sending emails already exists in the codebase (used for password reset) and could be reused with minimal effort.
+  \item \textbf{Scalability of the recommendation engine:} The recommender builds the full user-resource matrix on every API request. For the current user base this is acceptable, but it would not scale to thousands of users without pre-computation or caching.
+  \item \textbf{No content-based filtering:} Recommendations are based entirely on user behaviour. Two resources with identical titles but different quality would be treated identically by the engine. Adding content-based features (topic tags, resource type, title keywords) would improve recommendations for newly added resources.
+  \item \textbf{Single binary admin role:} The \texttt{is\_admin} flag is a boolean. There is no moderator-level role with partial permissions, making it impossible to delegate content review without granting full admin access.
+\end{itemize}
+
+These limitations represent natural starting points for future work, as described in the following chapter.
+
+% ============================================================
+% CHAPTER 10 -- CONCLUSION AND FUTURE WORK
+% ============================================================
+\chapter{Conclusion and Future Work}
+
+\section{Conclusion}
+
+Opic was designed to solve a real and familiar problem: the difficulty of navigating a vast sea of online learning material as a student. The platform was successfully built and deployed within the planned timeframe, delivering all fourteen intended functional requirements.
+
+The most technically interesting component is the recommendation engine, which combines user-based collaborative filtering with a Bayesian average popularity score and a cold-start fallback driven by onboarding quiz answers. The result is a system that provides useful recommendations even for new users and improves meaningfully as users interact with more content.
+
+The project also demonstrated the value of a clean architecture. Separating the frontend, backend, and database into independent deployable units made it straightforward to host the entire system on free-tier cloud services without any infrastructure cost, and allowed each layer to be updated and redeployed independently throughout the development cycle.
+
+\section{Future Work}
+
+Given more time, the following improvements would be the most impactful:
+
+\begin{enumerate}
+  \item \textbf{JWT refresh tokens:} The current implementation issues a single access token that expires after a fixed period, silently logging out the user. A refresh token flow would maintain sessions more gracefully without compromising security.
+
+  \item \textbf{Email notifications for review decisions:} Notify users automatically when their resource submission is approved or rejected. The SMTP infrastructure already exists in the codebase and could be reused with minimal effort.
+
+  \item \textbf{Recommendation caching:} The recommendation engine currently rebuilds the full user-resource matrix on every API call. Pre-computing and caching the matrix on a fixed schedule (e.g.\ every 30 minutes) would significantly reduce response times at scale.
+
+  \item \textbf{Hybrid content-based filtering:} Adding content-based features -- resource type, topic tags, title keywords -- would improve recommendations for new resources that have not yet been rated by many users.
+
+  \item \textbf{Pagination:} Several endpoints return all records in a single response. Adding limit/offset pagination would be necessary for a production-scale content library.
+
+  \item \textbf{Mobile application:} A React Native version of the frontend would provide a better experience for users who prefer to learn on their phones.
+
+  \item \textbf{Analytics dashboard:} An admin view showing platform-wide statistics -- most popular topics, average completion rate, rating distributions, and daily active users -- would help administrators make data-driven content decisions.
+\end{enumerate}
+
+% ============================================================
+% REFERENCES
+% ============================================================
+\chapter*{References}
+\addcontentsline{toc}{chapter}{References}
+
+\begin{enumerate}[label={[\arabic*]}]
+  \item Resnick, P., Iacovou, N., Suchak, M., Bergstrom, P., \& Riedl, J. (1994). GroupLens: An open architecture for collaborative filtering of netnews. \textit{Proceedings of the 1994 ACM Conference on Computer Supported Cooperative Work}, 175--186.
+
+  \item Koren, Y., Bell, R., \& Volinsky, C. (2009). Matrix factorization techniques for recommender systems. \textit{Computer}, 42(8), 30--37.
+
+  \item FastAPI Documentation. (2024). \textit{FastAPI}. Retrieved from \url{https://fastapi.tiangolo.com}
+
+  \item React Documentation. (2024). \textit{React}. Retrieved from \url{https://react.dev}
+
+  \item SQLAlchemy Documentation. (2024). \textit{SQLAlchemy}. Retrieved from \url{https://docs.sqlalchemy.org}
+
+  \item Herlocker, J. L., Konstan, J. A., Terveen, L. G., \& Riedl, J. T. (2004). Evaluating collaborative filtering recommender systems. \textit{ACM Transactions on Information Systems}, 22(1), 5--53.
+
+  \item Wilson, E. B. (1927). Probable inference, the law of succession, and statistical inference. \textit{Journal of the American Statistical Association}, 22(158), 209--212.
+
+  \item JSON Web Tokens. (2024). \textit{JWT.io -- Introduction}. Retrieved from \url{https://jwt.io/introduction}
+
+  \item OWASP Foundation. (2024). \textit{Password Storage Cheat Sheet}. Retrieved from \url{https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html}
+
+  \item MDN Web Docs. (2024). \textit{Cross-Origin Resource Sharing (CORS)}. Retrieved from \url{https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS}
+\end{enumerate}
+
+\end{document}

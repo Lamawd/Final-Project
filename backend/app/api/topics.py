@@ -78,7 +78,7 @@ async def get_quiz(topic_id: int, db: Session = Depends(get_db),
     gemini_key = os.environ.get("GEMINI_API_KEY", "")
 
     prompt = (
-        f'Generate exactly 3 multiple choice questions to test knowledge of "{topic.title}".\n'
+        f'Generate exactly 5 multiple choice questions to test knowledge of "{topic.title}".\n'
         f'Topic description: {topic.description or "a programming/tech topic"}\n'
         f'Rules:\n'
         f'- Questions must test actual understanding of the topic concepts, not feelings\n'
@@ -86,8 +86,9 @@ async def get_quiz(topic_id: int, db: Session = Depends(get_db),
         f'- Only one option is correct\n'
         f'- "answer" is the 0-based index of the correct option\n'
         f'- Make the wrong options plausible (not obviously wrong)\n'
+        f'- Vary the position of the correct answer (not always index 0)\n'
         f'Return ONLY valid JSON, no markdown, no extra text.\n'
-        f'Format: {{"questions": [{{"q": "question text", "options": ["option0", "option1", "option2", "option3"], "answer": 0}}]}}'
+        f'Format: {{"questions": [{{"q": "question text", "options": ["option0", "option1", "option2", "option3"], "answer": 2}}]}}'
     )
 
     if gemini_key:
@@ -108,29 +109,29 @@ async def get_quiz(topic_id: int, db: Session = Depends(get_db),
         except Exception:
             pass  # fall through to local generation
 
-    # Local fallback: use Gemini-style questions derived from topic title keywords
+    # Local fallback: use topic title/description to form knowledge questions
     title = topic.title
     desc  = topic.description or ""
     return {"questions": [
         {
             "q": f"What is the primary purpose of {title}?",
             "options": [
-                f"To {desc[:60].rstrip()}..." if len(desc) > 20 else f"To understand core concepts of {title}",
                 f"To replace all existing programming paradigms",
+                f"To understand and apply core concepts of {title}",
                 f"To generate random outputs without structure",
                 f"To slow down application performance intentionally",
             ],
-            "answer": 0,
+            "answer": 1,
         },
         {
             "q": f"Which statement about {title} is most accurate?",
             "options": [
-                f"It is a well-defined concept used in software development",
                 f"It only applies to hardware-level programming",
                 f"It was invented last year and has no real applications",
+                f"It is a well-defined concept used in software development",
                 f"It is only relevant to mobile app development",
             ],
-            "answer": 0,
+            "answer": 2,
         },
         {
             "q": f"After learning {title}, a developer would be able to:",
@@ -141,6 +142,26 @@ async def get_quiz(topic_id: int, db: Session = Depends(get_db),
                 f"Only work with legacy codebases",
             ],
             "answer": 0,
+        },
+        {
+            "q": f"Which best describes a key characteristic of {title}?",
+            "options": [
+                f"It is rarely used in modern software projects",
+                f"It requires specialised hardware to implement",
+                f"It has well-documented best practices in the industry",
+                f"It is only applicable to academic research",
+            ],
+            "answer": 2,
+        },
+        {
+            "q": f"When would a developer most likely use {title}?",
+            "options": [
+                f"Never, because it is an outdated concept",
+                f"Only when building operating systems",
+                f"When solving a problem that this topic is specifically designed to address",
+                f"Only in large enterprise applications",
+            ],
+            "answer": 2,
         },
     ]}
 

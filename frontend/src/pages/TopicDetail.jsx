@@ -485,10 +485,12 @@ function LowRatingModal({ stars, onSubmit, onSkip }) {
 
 function QuizModal({ questions, topicTitle, onFinish, onSkip }) {
   const [step, setStep]       = useState(0);
-  const [selected, setSelected] = useState(null);   // index of chosen option
-  const [revealed, setRevealed] = useState(false);  // show correct/wrong feedback
+  const [selected, setSelected] = useState(null);
+  const [revealed, setRevealed] = useState(false);
+  const [wrongs, setWrongs]   = useState(0);       // count of wrong answers
   const [score, setScore]     = useState(0);
   const [done, setDone]       = useState(false);
+  const [retrying, setRetrying] = useState(false);  // showing retry screen
 
   const current = questions[step];
   const isLast  = step === questions.length - 1;
@@ -503,15 +505,64 @@ function QuizModal({ questions, topicTitle, onFinish, onSkip }) {
     const correct = selected === current.answer;
     setRevealed(true);
     if (correct) setScore((s) => s + 1);
+    else         setWrongs((w) => w + 1);
   };
 
   const handleNext = () => {
-    if (isLast) { setDone(true); return; }
+    if (isLast) {
+      // Check if too many wrong — show retry screen
+      const newWrongs = wrongs + (revealed && selected !== current.answer ? 0 : 0); // already counted
+      if (wrongs >= 3) { setRetrying(true); return; }
+      setDone(true);
+      return;
+    }
     setStep((s) => s + 1);
     setSelected(null);
     setRevealed(false);
   };
 
+  // After last question revealed, check wrongs before moving to done
+  const handleFinish = () => {
+    if (wrongs >= 3) { setRetrying(true); }
+    else             { setDone(true); }
+  };
+
+  const handleRetry = () => {
+    setStep(0);
+    setSelected(null);
+    setRevealed(false);
+    setWrongs(0);
+    setScore(0);
+    setDone(false);
+    setRetrying(false);
+  };
+
+  // Retry screen
+  if (retrying) {
+    return (
+      <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <motion.div className="modal-box" initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.88, opacity: 0 }}>
+          <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            ⚠️ Not quite there yet
+          </h3>
+          <p style={{ margin: "12px 0 6px", fontSize: "1rem" }}>
+            You got <strong>{wrongs} question{wrongs !== 1 ? "s" : ""} wrong</strong> (3 or more means a retry).
+          </p>
+          <p style={{ color: "#6b7280", fontSize: "0.9rem", marginBottom: 16 }}>
+            Review the topic and try again — you can do it! 💪
+          </p>
+          <div className="modal-actions">
+            <button className="btn btn-primary" onClick={handleRetry}>
+              Try Again
+            </button>
+            <button className="btn" onClick={onSkip} style={{ fontSize: 13 }}>Skip &amp; Complete anyway</button>
+          </div>
+        </motion.div>
+      </motion.div>
+    );
+  }
+
+  // Done screen
   if (done) {
     const total = questions.length;
     const pct   = Math.round((score / total) * 100);
@@ -525,9 +576,10 @@ function QuizModal({ questions, topicTitle, onFinish, onSkip }) {
             {score} / {total} correct ({pct}%)
           </p>
           <p style={{ color: "#6b7280", fontSize: "0.9rem", marginBottom: 16 }}>
-            {pct === 100 ? "Perfect! Great understanding 🎉" :
-             pct >= 60  ? "Good job! Keep it up 👍" :
-                          "No worries — reviewing again helps 📖"}
+            {pct === 100 ? "Perfect score! Outstanding 🎉" :
+             pct >= 80   ? "Great job! Solid understanding 👍" :
+             pct >= 60   ? "Good effort! Keep reviewing 📖" :
+                           "Keep studying — you'll get there! 💪"}
           </p>
           <div className="modal-actions">
             <button className="btn btn-primary" onClick={onFinish}>
@@ -547,7 +599,14 @@ function QuizModal({ questions, topicTitle, onFinish, onSkip }) {
           <h3 style={{ display: "flex", alignItems: "center", gap: 8, margin: 0 }}>
             <Sparkles size={18} color="#4f46e5" /> Quick Quiz
           </h3>
-          <span style={{ fontSize: 13, color: "#9ca3af" }}>{step + 1} / {questions.length}</span>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {wrongs > 0 && (
+              <span style={{ fontSize: 12, color: "#ef4444", fontWeight: 600 }}>
+                {wrongs} wrong {wrongs >= 2 ? "⚠️" : ""}
+              </span>
+            )}
+            <span style={{ fontSize: 13, color: "#9ca3af" }}>{step + 1} / {questions.length}</span>
+          </div>
         </div>
 
         <p style={{ margin: "14px 0 12px", fontWeight: 500, lineHeight: 1.5 }}>{current.q}</p>
@@ -582,13 +641,19 @@ function QuizModal({ questions, topicTitle, onFinish, onSkip }) {
           })}
         </div>
 
+        {revealed && wrongs >= 2 && !isLast && (
+          <p style={{ marginTop: 10, fontSize: 13, color: "#f59e0b", fontWeight: 500 }}>
+            ⚠️ One more wrong answer and you'll need to retry!
+          </p>
+        )}
+
         <div className="modal-actions" style={{ marginTop: 16 }}>
           {!revealed ? (
             <button className="btn btn-primary" onClick={handleConfirm} disabled={selected === null}>
               Confirm
             </button>
           ) : (
-            <button className="btn btn-primary" onClick={handleNext}>
+            <button className="btn btn-primary" onClick={isLast ? handleFinish : handleNext}>
               {isLast ? "See Results" : "Next →"}
             </button>
           )}
