@@ -22,6 +22,8 @@
 \usepackage{tocbibind}
 \usepackage{caption}
 \usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{matrix,positioning,arrows.meta,fit,backgrounds}
 
 % --- Page style ---
 \pagestyle{fancy}
@@ -912,7 +914,87 @@ Figure~\ref{fig:seq-rec} shows how recommendations are generated when a user ope
 
 \subsection{User-Based Collaborative Filtering (UBCF)}
 
-For users who have rated at least one resource, the system builds a user-resource matrix where each cell represents a weighted engagement score that combines explicit ratings with implicit engagement signals:
+For users who have rated at least one resource, the system builds a user-resource matrix where each cell represents a weighted engagement score. Figure~\ref{fig:ubcf-matrix} illustrates how the matrix is used to predict a missing score for the target user.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  cell/.style={draw, minimum width=1.6cm, minimum height=0.7cm, font=\small},
+  header/.style={draw, minimum width=1.6cm, minimum height=0.7cm, font=\small\bfseries, fill=gray!20},
+  rowlabel/.style={minimum width=1.8cm, minimum height=0.7cm, font=\small\bfseries, align=right},
+  predict/.style={draw, minimum width=1.6cm, minimum height=0.7cm, font=\small\bfseries, fill=yellow!40},
+  highlight/.style={draw, minimum width=1.6cm, minimum height=0.7cm, font=\small, fill=blue!10},
+]
+
+% Column headers
+\node[rowlabel] (r0) at (0,0) {};
+\node[header, right=0cm of r0] (h1) {Res 1};
+\node[header, right=0cm of h1] (h2) {Res 2};
+\node[header, right=0cm of h2] (h3) {Res 3};
+\node[header, right=0cm of h3] (h4) {Res 4};
+\node[header, right=0cm of h4] (h5) {Res 5};
+
+% Row: User A
+\node[rowlabel, below=0cm of r0] (rA) {User A};
+\node[cell, right=0cm of rA] {0.82};
+\node[cell, right=0cm of rA-|h2] {0.65};
+\node[cell, right=0cm of rA-|h3] {0.00};
+\node[cell, right=0cm of rA-|h4] {0.71};
+\node[cell, right=0cm of rA-|h5] {0.00};
+
+% Row: User B
+\node[rowlabel, below=0cm of rA] (rB) {User B};
+\node[highlight, right=0cm of rB] {0.78};
+\node[cell,    right=0cm of rB-|h2] {0.60};
+\node[cell,    right=0cm of rB-|h3] {0.88};
+\node[highlight, right=0cm of rB-|h4] {0.00};
+\node[highlight, right=0cm of rB-|h5] {0.75};
+
+% Row: User C (target)
+\node[rowlabel, below=0cm of rB] (rC) {\textbf{User C ★}};
+\node[highlight, right=0cm of rC] {\textbf{0.80}};
+\node[cell,    right=0cm of rC-|h2] {0.00};
+\node[cell,    right=0cm of rC-|h3] {0.00};
+\node[highlight, right=0cm of rC-|h4] {\textbf{0.68}};
+\node[predict, right=0cm of rC-|h5] {\textbf{?}};
+
+% Row: User D
+\node[rowlabel, below=0cm of rC] (rD) {User D};
+\node[cell, right=0cm of rD] {0.00};
+\node[cell, right=0cm of rD-|h2] {0.55};
+\node[cell, right=0cm of rD-|h3] {0.90};
+\node[cell, right=0cm of rD-|h4] {0.00};
+\node[cell, right=0cm of rD-|h5] {0.00};
+
+\end{tikzpicture}
+\caption{UBCF User-Resource Matrix. User C (target, ★) shares high scores on Resource 1 and 4 with User B (blue). The system predicts User C's score for Resource 5 using User B's engagement, then recommends it.}
+\label{fig:ubcf-matrix}
+\end{figure}
+
+Figure~\ref{fig:score-weights} shows the five input signals and their weights that make up each cell value in the matrix.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  signal/.style={draw, rounded corners, fill=blue!8, minimum width=3.4cm, minimum height=0.65cm, font=\small, align=center},
+  result/.style={draw, rounded corners, fill=green!15, minimum width=3.0cm, minimum height=0.8cm, font=\small\bfseries, align=center},
+  arr/.style={-{Stealth}, thick},
+]
+\node[signal] (s1) at (0, 4.0)  {Star Rating $\times\ 0.35$};
+\node[signal] (s2) at (0, 2.8)  {Watch Completion $\times\ 0.25$};
+\node[signal] (s3) at (0, 1.6)  {Time Spent (cap 600s) $\times\ 0.20$};
+\node[signal] (s4) at (0, 0.4)  {Revisit Count (norm) $\times\ 0.10$};
+\node[signal] (s5) at (0, -0.8) {Completed (0 or 1) $\times\ 0.10$};
+\node[result] (sc) at (5.8, 1.6){Engagement Score \\ $\in [0.0,\ 1.0]$};
+\draw[arr] (s1.east) to[out=0,in=150] (sc.west);
+\draw[arr] (s2.east) to[out=0,in=160] (sc.west);
+\draw[arr] (s3.east) -- (sc.west);
+\draw[arr] (s4.east) to[out=0,in=200] (sc.west);
+\draw[arr] (s5.east) to[out=0,in=210] (sc.west);
+\end{tikzpicture}
+\caption{Engagement Score -- Five Input Signals and Weights}
+\label{fig:score-weights}
+\end{figure}
 
 \begin{equation}
   \text{score} = 0.35 \cdot \frac{\text{stars}}{5} + 0.25 \cdot w_{\text{watch}} + 0.20 \cdot \frac{\min(t, 600)}{600} + 0.10 \cdot r_{\text{revisit}} + 0.10 \cdot c_{\text{complete}}
@@ -961,6 +1043,44 @@ Topics are only boosted if the user gave a positive answer to the corresponding 
 When a user clicks ``Mark Complete'' on a topic (UC-11), the system calls the \texttt{GET /topics/\{id\}/quiz} endpoint, which uses the \textbf{Google Gemini 2.0 Flash} API to generate five multiple choice questions tailored to the topic's title and description. The quiz is shown in a modal before the topic is recorded as complete in the database.
 
 \subsection{Quiz Flow}
+
+The quiz presents one question at a time. Figure~\ref{fig:quiz-flow} shows the complete decision flow from clicking ``Mark Complete'' to topic completion.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  startstop/.style={draw, rounded corners=10pt, fill=indigo!15, minimum width=3.2cm, minimum height=0.6cm, font=\small, align=center},
+  process/.style={draw, fill=blue!8, minimum width=3.2cm, minimum height=0.6cm, font=\small, align=center},
+  decision/.style={draw, diamond, fill=orange!15, minimum width=1cm, font=\small, align=center, inner sep=2pt},
+  arr/.style={-{Stealth}, thick},
+  node distance=0.55cm,
+]
+\definecolor{indigo}{RGB}{79,70,229}
+
+\node[startstop] (start)  {Mark Complete clicked};
+\node[process,   below=of start]  (fetch)   {Fetch 5 questions\\ from Gemini API};
+\node[decision,  below=of fetch]  (apiok)   {API OK?};
+\node[process,   right=2cm of apiok] (fallback) {Use local\\ fallback Qs};
+\node[process,   below=of apiok]  (quiz)    {Show Quiz Modal\\ (5 MCQ questions)};
+\node[decision,  below=of quiz]   (wrong)   {Wrong $\geq 3$?};
+\node[process,   right=2cm of wrong] (retry)   {Retry Screen};
+\node[process,   below=of wrong]  (score)   {Show Score Summary};
+\node[startstop, below=of score]  (done)    {Topic Marked Complete};
+
+\draw[arr] (start)    -- (fetch);
+\draw[arr] (fetch)    -- (apiok);
+\draw[arr] (apiok)    -- node[left,font=\small]{Yes} (quiz);
+\draw[arr] (apiok)    -- node[above,font=\small]{No} (fallback);
+\draw[arr] (fallback) |- (quiz);
+\draw[arr] (quiz)     -- (wrong);
+\draw[arr] (wrong)    -- node[left,font=\small]{No} (score);
+\draw[arr] (wrong)    -- node[above,font=\small]{Yes} (retry);
+\draw[arr] (retry)    |- (quiz);
+\draw[arr] (score)    -- (done);
+\end{tikzpicture}
+\caption{AI Knowledge Quiz Decision Flow}
+\label{fig:quiz-flow}
+\end{figure}
 
 The quiz presents one question at a time. The user selects one of four options (A--D) and clicks Confirm to reveal whether their answer was correct (highlighted green) or wrong (highlighted red with the correct answer also shown in green). A running wrong-answer counter is visible in the modal header. If the user accumulates \textbf{three or more incorrect answers}, the quiz ends with a retry screen prompting them to review the material and attempt the quiz again. If they pass (fewer than three wrong), a score summary is shown and a ``Mark as Complete'' button finalises the topic completion. A ``Skip quiz'' button is always available for users who wish to bypass the assessment.
 
