@@ -8,19 +8,48 @@ import { useAuth } from "../context/AuthContext";
 export default function Register() {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [form, setForm] = useState({ username: "", email: "", password: "" });
-  const [error, setError] = useState("");
+  const [form, setForm]     = useState({ username: "", email: "", password: "" });
+  const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+
+  const setField = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setErrors((prev) => ({ ...prev, [field]: "" }));
+  };
+
+  const validate = () => {
+    const e = {};
+    if (!form.username.trim())            e.username = "Username is required";
+    else if (form.username.trim().length < 2) e.username = "Username must be at least 2 characters";
+    if (!form.email)                      e.email    = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Enter a valid email address";
+    if (!form.password)                   e.password = "Password is required";
+    else if (form.password.length < 8)    e.password = "Password must be at least 8 characters";
+    return e;
+  };
 
   const submit = async (e) => {
     e.preventDefault();
+    const v = validate();
+    if (Object.keys(v).length) { setErrors(v); return; }
+    setErrors({});
     setLoading(true);
     try {
       await api.post("/auth/register", form);
       await login(form.email, form.password);
       navigate("/onboarding");
     } catch (err) {
-      setError(err.response?.data?.detail || "Registration failed");
+      const msg = err.response?.data?.detail || "Registration failed. Please try again.";
+      // Route the server message to the right field
+      if (msg.toLowerCase().includes("email")) {
+        setErrors({ email: msg });
+      } else if (msg.toLowerCase().includes("username")) {
+        setErrors({ username: msg });
+      } else if (msg.toLowerCase().includes("password")) {
+        setErrors({ password: msg });
+      } else {
+        setErrors({ general: msg });
+      }
     } finally {
       setLoading(false);
     }
@@ -38,28 +67,34 @@ export default function Register() {
         >
           <h2>Create account</h2>
           <p className="auth-sub">Start your learning journey today</p>
-          <form onSubmit={submit}>
+          <form onSubmit={submit} noValidate>
             <input
               placeholder="Username"
               value={form.username}
-              onChange={(e) => setForm({ ...form, username: e.target.value })}
+              onChange={(e) => setField("username", e.target.value)}
+              className={errors.username ? "input-error" : ""}
               required
             />
+            {errors.username && <p className="error-msg">{errors.username}</p>}
             <input
               type="email"
               placeholder="Email"
               value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              onChange={(e) => setField("email", e.target.value)}
+              className={errors.email ? "input-error" : ""}
               required
             />
+            {errors.email && <p className="error-msg">{errors.email}</p>}
             <input
               type="password"
-              placeholder="Password"
+              placeholder="Password (min. 8 characters)"
               value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              onChange={(e) => setField("password", e.target.value)}
+              className={errors.password ? "input-error" : ""}
               required
             />
-            {error && <p className="error-msg">{error}</p>}
+            {errors.password && <p className="error-msg">{errors.password}</p>}
+            {errors.general  && <p className="error-msg">{errors.general}</p>}
             <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
               {loading ? "Creating account…" : "Register"}
             </button>

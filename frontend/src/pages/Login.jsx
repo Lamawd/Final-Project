@@ -8,17 +8,36 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: "", password: "" });
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+
+  const validate = () => {
+    const e = {};
+    if (!form.email)                              e.email    = "Email is required";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "Enter a valid email address";
+    if (!form.password)                           e.password = "Password is required";
+    return e;
+  };
 
   const submit = async (e) => {
     e.preventDefault();
+    const v = validate();
+    if (Object.keys(v).length) { setErrors(v); return; }
+    setErrors({});
     setLoading(true);
     try {
       await login(form.email, form.password);
       navigate("/");
-    } catch {
-      setError("Invalid email or password");
+    } catch (err) {
+      const msg = err.response?.data?.detail || "Login failed. Please try again.";
+      // Route the server message to the right field
+      if (msg.toLowerCase().includes("email") || msg.toLowerCase().includes("account")) {
+        setErrors({ email: msg });
+      } else if (msg.toLowerCase().includes("password")) {
+        setErrors({ password: msg });
+      } else {
+        setErrors({ general: msg });
+      }
     } finally {
       setLoading(false);
     }
@@ -36,22 +55,26 @@ export default function Login() {
         >
           <h2>Welcome back</h2>
           <p className="auth-sub">Log in to continue learning</p>
-          <form onSubmit={submit}>
+          <form onSubmit={submit} noValidate>
             <input
               type="email"
               placeholder="Email"
               value={form.email}
-              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              onChange={(e) => { setForm({ ...form, email: e.target.value }); setErrors((prev) => ({ ...prev, email: "" })); }}
+              className={errors.email ? "input-error" : ""}
               required
             />
+            {errors.email && <p className="error-msg">{errors.email}</p>}
             <input
               type="password"
               placeholder="Password"
               value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              onChange={(e) => { setForm({ ...form, password: e.target.value }); setErrors((prev) => ({ ...prev, password: "" })); }}
+              className={errors.password ? "input-error" : ""}
               required
             />
-            {error && <p className="error-msg">{error}</p>}
+            {errors.password && <p className="error-msg">{errors.password}</p>}
+            {errors.general  && <p className="error-msg">{errors.general}</p>}
             <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
               {loading ? "Logging in…" : "Log In"}
             </button>

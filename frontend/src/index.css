@@ -457,6 +457,16 @@ nav .nav-right { margin-left: auto; display: flex; align-items: center; gap: 12p
   border-color: #4f46e5;
 }
 
+.auth-form-box input.input-error {
+  border-color: #dc2626;
+  background: #fff5f5;
+}
+
+.auth-form-box .error-msg {
+  margin-top: -8px;
+  margin-bottom: 10px;
+}
+
 .btn-full { width: 100%; justify-content: center; }
 
 .auth-switch {

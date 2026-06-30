@@ -40,6 +40,7 @@ export default function TopicDetail() {
   const [suggestMsg, setSuggestMsg]     = useState("");
   const [suggestErr, setSuggestErr]     = useState("");
   const [ratingModal, setRatingModal]   = useState(null);
+  const [quizModal, setQuizModal]       = useState(null);   // {questions, pendingComplete}
 
   const course = topic ? COURSES.find((c) => c.id === courseOf(topic)) : null;
 
@@ -133,9 +134,28 @@ export default function TopicDetail() {
 
   const markTopicComplete = async () => {
     const next = !topicCompleted;
-    await api.post(`/topics/${id}/progress`, null, { params: { completed: next } });
-    setTopicCompleted(next);
-    if (next && course) setTimeout(() => navigate(`/courses/${course.id}`), 800);
+    if (next) {
+      // Show quiz before marking complete
+      try {
+        const res = await api.get(`/topics/${id}/quiz`);
+        setQuizModal({ questions: res.data.questions, pendingComplete: true });
+      } catch {
+        // If quiz fails, just mark complete normally
+        await api.post(`/topics/${id}/progress`, null, { params: { completed: true } });
+        setTopicCompleted(true);
+        if (course) setTimeout(() => navigate(`/courses/${course.id}`), 800);
+      }
+    } else {
+      await api.post(`/topics/${id}/progress`, null, { params: { completed: false } });
+      setTopicCompleted(false);
+    }
+  };
+
+  const finishQuiz = async () => {
+    await api.post(`/topics/${id}/progress`, null, { params: { completed: true } });
+    setTopicCompleted(true);
+    setQuizModal(null);
+    if (course) setTimeout(() => navigate(`/courses/${course.id}`), 800);
   };
 
   if (!topic) return <p className="loading">Loading…</p>;
@@ -416,6 +436,17 @@ export default function TopicDetail() {
           />
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {quizModal && (
+          <QuizModal
+            questions={quizModal.questions}
+            topicTitle={topic.title}
+            onFinish={finishQuiz}
+            onSkip={finishQuiz}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -446,6 +477,92 @@ function LowRatingModal({ stars, onSubmit, onSkip }) {
         <div className="modal-actions">
           <button className="btn btn-primary" onClick={() => onSubmit(reason || null)}>Submit</button>
           <button className="btn" onClick={onSkip}>Skip</button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function QuizModal({ questions, topicTitle, onFinish, onSkip }) {
+  const [step, setStep]       = useState(0);   // which question (0,1,2)
+  const [answers, setAnswers] = useState({});  // {0: "user answer", ...}
+  const [showHint, setShowHint] = useState({});
+  const [done, setDone]       = useState(false);
+
+  const current = questions[step];
+  const isLast  = step === questions.length - 1;
+
+  const handleNext = () => {
+    if (isLast) setDone(true);
+    else setStep((s) => s + 1);
+  };
+
+  if (done) {
+    return (
+      <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <motion.div className="modal-box" initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.88, opacity: 0 }}>
+          <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Sparkles size={20} color="#4f46e5" /> Quiz complete!
+          </h3>
+          <p style={{ margin: "12px 0", color: "#6b7280" }}>
+            Great job reflecting on <strong>{topicTitle.replace(/^[^:]+: /, "")}</strong>.
+            Your answers have been noted — keep it up!
+          </p>
+          <div className="modal-actions">
+            <button className="btn btn-primary" onClick={onFinish}>
+              <Check size={14} style={{ display: "inline", marginRight: 4 }} />
+              Mark as Complete
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div className="modal-overlay" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <motion.div className="modal-box" style={{ maxWidth: 480 }} initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.88, opacity: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+          <h3 style={{ display: "flex", alignItems: "center", gap: 8, margin: 0 }}>
+            <Sparkles size={18} color="#4f46e5" /> Quick Quiz
+          </h3>
+          <span style={{ fontSize: 13, color: "#9ca3af" }}>{step + 1} / {questions.length}</span>
+        </div>
+        <p style={{ margin: "14px 0 8px", fontWeight: 500 }}>{current.q}</p>
+        <textarea
+          className="reason-input"
+          placeholder="Type your answer…"
+          value={answers[step] || ""}
+          onChange={(e) => setAnswers((prev) => ({ ...prev, [step]: e.target.value }))}
+          rows={3}
+          style={{ width: "100%", boxSizing: "border-box" }}
+        />
+        {current.hint && (
+          <div style={{ marginTop: 6 }}>
+            {showHint[step] ? (
+              <p style={{ fontSize: 13, color: "#6b7280", margin: 0 }}>
+                💡 {current.hint}
+              </p>
+            ) : (
+              <button
+                className="btn"
+                style={{ fontSize: 12, padding: "2px 10px" }}
+                onClick={() => setShowHint((prev) => ({ ...prev, [step]: true }))}
+              >
+                Show hint
+              </button>
+            )}
+          </div>
+        )}
+        <div className="modal-actions" style={{ marginTop: 16 }}>
+          <button
+            className="btn btn-primary"
+            onClick={handleNext}
+            disabled={!answers[step]?.trim()}
+          >
+            {isLast ? "Finish" : "Next"}
+          </button>
+          <button className="btn" onClick={onSkip} style={{ fontSize: 13 }}>Skip quiz</button>
         </div>
       </motion.div>
     </motion.div>

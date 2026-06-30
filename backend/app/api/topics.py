@@ -5,6 +5,7 @@ from typing import Optional
 from app.core.database import get_db
 from app.core.security import get_current_user, require_admin
 from app.models.models import Topic, TopicPrerequisite, UserProgress, User
+import httpx, os, json
 
 router = APIRouter(prefix="/topics", tags=["topics"])
 
@@ -67,9 +68,45 @@ def mark_progress(topic_id: int, completed: bool = True,
     return {"ok": True}
 
 
+@router.get("/{topic_id}/quiz")
+async def get_quiz(topic_id: int, db: Session = Depends(get_db),
+                   current_user: User = Depends(get_current_user)):
+    topic = db.query(Topic).filter(Topic.id == topic_id).first()
+    if not topic:
+        raise HTTPException(status_code=404, detail="Topic not found")
+
+    gemini_key = os.environ.get("GEMINI_API_KEY", "")
+    if not gemini_key:
+        raise HTTPException(status_code=503, detail="Quiz unavailable: GEMINI_API_KEY not set")
+
+    prompt = (
+        f'Generate exactly 3 short comprehension questions to test if someone just learned about "{topic.title}".\n'
+        f'Topic description: {topic.description or "a programming/tech topic"}\n'
+        f'Return ONLY valid JSON, no markdown, no extra text.\n'
+        f'Format: {{"questions": [{{"q": "question text", "hint": "short hint"}}]}}'
+    )
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
+                json={"contents": [{"parts": [{"text": prompt}]}]},
+            )
+        resp.raise_for_status()
+        raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+        # Strip markdown code fences if Gemini adds them
+        raw = raw.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+        return json.loads(raw)
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=502, detail=f"Gemini API error: {e.response.status_code}")
+    except Exception:
+        raise HTTPException(status_code=502, detail="Failed to generate quiz. Try again.")
+
+
 @router.get("/progress/me")
-def my_progress(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    rows = db.query(UserProgress).filter_by(user_id=current_user.id).all()
+def my_progress(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):    rows = db.query(UserProgress).filter_by(user_id=current_user.id).all()
     return [{"topic_id": r.topic_id, "completed": r.completed} for r in rows]
 
 

@@ -80,7 +80,9 @@ class TokenResponse(BaseModel):
 @limiter.limit("10/minute")
 def register(request: Request, req: RegisterRequest, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == req.email).first():
-        raise HTTPException(status_code=400, detail="Email already registered")
+        raise HTTPException(status_code=400, detail="An account with this email already exists")
+    if db.query(User).filter(User.username == req.username).first():
+        raise HTTPException(status_code=400, detail="This username is already taken")
     user = User(username=req.username, email=req.email, hashed_password=hash_password(req.password))
     db.add(user)
     db.commit()
@@ -92,8 +94,10 @@ def register(request: Request, req: RegisterRequest, db: Session = Depends(get_d
 @limiter.limit("20/minute")
 def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == form.username).first()
-    if not user or not verify_password(form.password, user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No account found with that email")
+    if not verify_password(form.password, user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect password")
     token = create_access_token({"sub": str(user.id), "is_admin": user.is_admin})
     return {"access_token": token}
 
