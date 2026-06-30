@@ -65,51 +65,61 @@
 
 \begin{titlepage}
 \centering
+\thispagestyle{empty}
 
-% University logo (place logo.png in the same folder as this .tex file)
+\textbf{\large UNIVERSITY OF SCIENCE AND TECHNOLOGY OF HANOI}\\[0.3cm]
+\textbf{\large DEPARTMENT OF INFORMATION AND COMMUNICATION TECHNOLOGY}\\[1.5cm]
+
 \IfFileExists{logo.png}{%
-  \includegraphics[width=3.5cm]{logo.png}\\[0.5cm]%
+  \includegraphics[width=4.5cm]{logo.png}%
 }{%
-  \fbox{\parbox{3.5cm}{\centering\vspace{0.8cm}\small[University Logo]\vspace{0.8cm}}}\\[0.5cm]%
-}
+  \fbox{\parbox{4cm}{\centering\vspace{1cm}\small[University Logo]\vspace{1cm}}}%
+}\\[1.5cm]
 
-\textbf{\large UNIVERSITY OF SCIENCE AND TECHNOLOGY OF HANOI}\\[0.2cm]
-\textbf{\large DEPARTMENT OF INFORMATION AND COMMUNICATION TECHNOLOGY}\\[2.5cm]
+{\LARGE \textbf{BACHELOR THESIS}}\\[1.2cm]
 
-{\fontsize{36}{42}\selectfont \textbf{OPIC}}\\[0.8cm]
-{\large A Topic-Structured Learning Platform with}\\
-{\large User-Driven Content Personalisation}\\[2.5cm]
+\noindent\rule{\textwidth}{0.8pt}\\[1.2cm]
 
-{\large \textbf{BACHELOR THESIS}}\\[2.5cm]
+{\fontsize{22}{28}\selectfont \textbf{Opic: A Topic-Structured Learning Platform\\[0.4cm]
+with User-Driven Content Personalisation}}\\[1.2cm]
 
-\begin{flushleft}
-\hspace{3cm}\begin{tabular}{ll}
-\textbf{Student:} & Vũ Tùng Lâm \\[0.3cm]
-\textbf{Student ID:} & 22BI13241 \\[0.3cm]
-\textbf{External Supervisor:} & Trương Trọng Tuấn \\[0.3cm]
-\textbf{Internal Supervisor:} & Nguyễn Thị Hà Trang \\
+\noindent\rule{\textwidth}{0.8pt}\\[2.0cm]
+
+\begin{center}
+\begin{tabular}{r@{\quad}l}
+\textit{Student:}             & \textbf{Vũ Tùng Lâm} \\[0.5cm]
+\textit{Student ID:}          & \textbf{22BI13241} \\[0.5cm]
+\textit{External Supervisor:} & \textbf{Trương Trọng Tuấn} \\[0.5cm]
+\textit{Internal Supervisor:} & \textbf{Nguyễn Thị Hà Trang} \\
 \end{tabular}
-\end{flushleft}
+\end{center}
 
 \vfill
-{\large Hanoi, 2026}
+{\large \textbf{Hanoi, June 2026}}
 \end{titlepage}
-\thispagestyle{empty}
 
 % ============================================================
-% DECLARATION
+% CERTIFICATION PAGE (page 2)
 % ============================================================
-\chapter*{Declaration}
+\newpage
 \thispagestyle{empty}
+\vspace*{3cm}
 
-I hereby declare that this thesis, titled ``Opic -- A Topic-Structured Learning Platform with User-Driven Content Personalisation'', is the result of my own work carried out under the guidance of my supervisors. All sources of information, data, figures, and prior work used in this report have been duly acknowledged and cited. The system, experiments, and results presented here are genuine and have not been submitted, in whole or in part, for any other degree or qualification.
+\noindent To whom it may concern,
+
+\vspace{1cm}
+
+\noindent I, \textbf{Trương Trọng Tuấn}, certify that the thesis of Mr \textbf{Vũ Tùng Lâm} is qualified to be presented in the Internship Jury 2025--2026.
+
+\vspace{5cm}
+
+\begin{flushright}
+Hanoi, 29\textsuperscript{th} June 2026
 
 \vspace{2cm}
-\noindent Hanoi, 2026
 
-\vspace{1.5cm}
-\noindent .................................\\
-Vũ Tùng Lâm
+\textbf{Supervisor's signature}
+\end{flushright}
 
 \newpage
 \chapter*{Acknowledgements}
