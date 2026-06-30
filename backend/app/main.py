@@ -52,6 +52,35 @@ app.include_router(recommendations.router)
 @app.on_event("startup")
 def startup():
     init_db()
+    # Safe column/table migrations for existing databases
+    from app.core.database import engine
+    import sqlalchemy as sa
+    with engine.connect() as conn:
+        migrations = [
+            "ALTER TABLE users ADD COLUMN avatar_url VARCHAR",
+            """CREATE TABLE IF NOT EXISTS comments (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                resource_id INTEGER NOT NULL REFERENCES resources(id),
+                body TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW()
+            )""",
+            """CREATE TABLE IF NOT EXISTS course_requests (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                title VARCHAR NOT NULL,
+                description TEXT,
+                status VARCHAR DEFAULT 'pending',
+                admin_note VARCHAR,
+                created_at TIMESTAMP DEFAULT NOW()
+            )""",
+        ]
+        for sql in migrations:
+            try:
+                conn.execute(sa.text(sql))
+                conn.commit()
+            except Exception:
+                pass  # already exists
 
 
 @app.get("/")

@@ -2,13 +2,29 @@
 import sys
 sys.path.insert(0, ".")
 
-from app.core.database import SessionLocal, init_db
+from app.core.database import SessionLocal, init_db, engine
 from app.core.security import hash_password
 from app.models.models import (
     Topic, TopicPrerequisite, User, OnboardingQuestion, OnboardingAnswer,
     Resource, ResourceStatus, Rating, Engagement, UserProgress
 )
 
+# Run safe column migrations before init_db so existing DBs get new columns
+def run_migrations():
+    with engine.connect() as conn:
+        migrations = [
+            "ALTER TABLE users ADD COLUMN avatar_url VARCHAR",
+            "CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL REFERENCES users(id), resource_id INTEGER NOT NULL REFERENCES resources(id), body TEXT NOT NULL, created_at DATETIME DEFAULT (datetime('now')))",
+            "CREATE TABLE IF NOT EXISTS course_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL REFERENCES users(id), title VARCHAR NOT NULL, description TEXT, status VARCHAR DEFAULT 'pending', admin_note VARCHAR, created_at DATETIME DEFAULT (datetime('now')))",
+        ]
+        for sql in migrations:
+            try:
+                conn.execute(__import__('sqlalchemy').text(sql))
+                conn.commit()
+            except Exception:
+                pass  # column/table already exists — safe to ignore
+
+run_migrations()
 init_db()
 db = SessionLocal()
 
