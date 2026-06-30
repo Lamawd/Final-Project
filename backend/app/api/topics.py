@@ -106,7 +106,8 @@ async def get_quiz(topic_id: int, db: Session = Depends(get_db),
 
 
 @router.get("/progress/me")
-def my_progress(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):    rows = db.query(UserProgress).filter_by(user_id=current_user.id).all()
+def my_progress(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    rows = db.query(UserProgress).filter_by(user_id=current_user.id).all()
     return [{"topic_id": r.topic_id, "completed": r.completed} for r in rows]
 
 
