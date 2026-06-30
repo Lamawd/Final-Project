@@ -11,8 +11,14 @@ import datetime
 router = APIRouter(prefix="/recommend", tags=["recommendations"])
 
 
+from pydantic import BaseModel as _Base
+
+class OnboardingAnswerItem(_Base):
+    question_id: int
+    answer: str
+
 class OnboardingSubmit(BaseModel):
-    answers: List[dict]  # [{question_id, answer}]
+    answers: List[OnboardingAnswerItem]
 
 
 @router.get("/topic/{topic_id}")
@@ -59,6 +65,6 @@ def submit_onboarding(data: OnboardingSubmit, current_user: User = Depends(get_c
     # Clear previous onboarding answers to prevent database bloating/duplicate rows
     db.query(OnboardingAnswer).filter_by(user_id=current_user.id).delete()
     for item in data.answers:
-        db.add(OnboardingAnswer(user_id=current_user.id, question_id=item["question_id"], answer=item["answer"]))
+        db.add(OnboardingAnswer(user_id=current_user.id, question_id=item.question_id, answer=item.answer[:500]))
     db.commit()
     return {"ok": True}

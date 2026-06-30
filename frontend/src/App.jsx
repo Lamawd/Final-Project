@@ -50,6 +50,7 @@ function Layout() {
         <Route path="/topics" element={<Protected><Topics /></Protected>} />
         <Route path="/courses/:courseId" element={<Protected><CourseDetail /></Protected>} />
         <Route path="/topics/:id" element={<Protected><TopicDetail /></Protected>} />
+        <Route path="/suggest" element={<Protected><SuggestPage /></Protected>} />
         <Route path="/progress" element={<Protected><Progress /></Protected>} />
         <Route path="/profile" element={<Protected><UserProfile /></Protected>} />
         <Route path="/admin" element={<AdminOnly><AdminReview /></AdminOnly>} />

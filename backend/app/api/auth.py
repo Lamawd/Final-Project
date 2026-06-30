@@ -1,16 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 from app.core.database import get_db
 from app.core.security import hash_password, verify_password, create_access_token, get_current_user, require_admin
 from app.models.models import User, PasswordResetToken
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 import secrets, os
 from datetime import datetime, timedelta
 import aiosmtplib
 from email.mime.text import MIMEText
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+limiter = Limiter(key_func=get_remote_address)
 
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
@@ -52,6 +55,21 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
 
+    @field_validator("password")
+    @classmethod
+    def password_strength(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+    @field_validator("username")
+    @classmethod
+    def username_clean(cls, v: str) -> str:
+        v = v.strip()
+        if not v or len(v) < 2:
+            raise ValueError("Username must be at least 2 characters")
+        return v[:50]
+
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -59,7 +77,8 @@ class TokenResponse(BaseModel):
 
 
 @router.post("/register", status_code=201)
-def register(req: RegisterRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def register(request: Request, req: RegisterRequest, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == req.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
     user = User(username=req.username, email=req.email, hashed_password=hash_password(req.password))
@@ -70,7 +89,8 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@limiter.limit("20/minute")
+def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == form.username).first()
     if not user or not verify_password(form.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
@@ -142,7 +162,8 @@ class ForgotPasswordRequest(BaseModel):
 
 
 @router.post("/forgot-password")
-async def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+async def forgot_password(request: Request, req: ForgotPasswordRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter_by(email=req.email).first()
     # Always return 200 to avoid user enumeration
     if not user:
@@ -151,14 +172,16 @@ async def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_
     # Invalidate any existing tokens for this user
     db.query(PasswordResetToken).filter_by(user_id=user.id).delete()
 
-    token = secrets.token_hex(3).upper()  # 6-char code e.g. "A3F9C2"
+    token = secrets.token_hex(4).upper()  # 8-char hex code (~32 bits entropy)
     expires = datetime.utcnow() + timedelta(minutes=10)
     db.add(PasswordResetToken(user_id=user.id, token=token, expires_at=expires))
     db.commit()
 
     if not SMTP_USER:
-        # No SMTP configured — surface token in response for dev only
-        return {"ok": True, "dev_token": token}
+        # No SMTP configured — log token server-side only (never expose in response)
+        import logging
+        logging.getLogger("opic").warning(f"[DEV] Password reset token for {user.email}: {token}")
+        return {"ok": True}
 
     try:
         await send_reset_email(user.email, token)
@@ -174,7 +197,8 @@ class ResetPasswordRequest(BaseModel):
 
 
 @router.post("/reset-password")
-def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def reset_password(request: Request, req: ResetPasswordRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter_by(email=req.email).first()
     if not user:
         raise HTTPException(status_code=400, detail="Invalid code")
