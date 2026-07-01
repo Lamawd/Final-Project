@@ -197,42 +197,50 @@ async def get_course_quiz(course_id: int, db: Session = Depends(get_db),
 
     if is_coding_course:
         prompt = (
-            f"Generate a course-completion exam for a student who has studied the following topics:\n"
+            f"Generate a challenging course-completion exam for a student who has studied these topics:\n"
             f"{topic_list}\n\n"
             f"Create exactly 10 questions total:\n"
             f"- 6 multiple choice questions (type: 'mcq')\n"
             f"- 4 coding challenge questions (type: 'code')\n\n"
-            f"Rules for MCQ:\n"
-            f"- Test genuine understanding, not trivia\n"
-            f"- 4 options each, one correct, plausible distractors\n"
+            f"Rules for MCQ (make these HARD — final exam level):\n"
+            f"- Test deep understanding, edge cases, and real-world application — NOT definitions or trivia\n"
+            f"- Include questions about time/space complexity, common bugs, tricky behaviour, design trade-offs\n"
+            f"- 4 options each, only one correct\n"
+            f"- All wrong options must be highly plausible — a student who half-understands should struggle\n"
             f"- 'answer' is the 0-based index of the correct option\n"
             f"- Vary correct answer positions\n\n"
-            f"Rules for coding questions:\n"
-            f"- Realistic small problems (like easy LeetCode)\n"
-            f"- Each must have a clear problem statement in 'q'\n"
-            f"- Provide a starter template in 'starter' (e.g. 'def solution(...):')\n"
-            f"- Provide 3-5 test cases in 'test_cases': [{{'input': ..., 'expected': ...}}]\n"
-            f"- 'language' should be 'python' for Python/DSA, 'javascript' for Web\n\n"
-            f"Return ONLY valid JSON, no markdown.\n"
+            f"Rules for coding questions (LeetCode easy-to-medium difficulty):\n"
+            f"- Concrete algorithmic problems — NOT 'write a class' or 'explain a concept'\n"
+            f"- Examples: 'Return indices of two numbers that sum to target', 'Find the longest substring without repeating characters', 'Reverse a linked list'\n"
+            f"- Each must have a clear problem statement in 'q' including input/output format\n"
+            f"- Provide a Python starter template in 'starter' matching the function signature\n"
+            f"- Provide 4-5 test cases in 'test_cases': [{{'input': [...], 'expected': ...}}]\n"
+            f"  where 'input' is a list of positional arguments matching the starter function signature\n"
+            f"- Include at least one edge case (empty input, single element, duplicates, etc.)\n"
+            f"- 'language': 'python'\n\n"
+            f"Return ONLY valid JSON, no markdown, no extra text.\n"
             f"Format:\n"
             f'{{"questions": ['
             f'{{"type": "mcq", "q": "...", "options": ["...", "...", "...", "..."], "answer": 0}}, '
-            f'{{"type": "code", "q": "Write a function ...", "starter": "def solution(...):\\n    pass", '
-            f'"test_cases": [{{"input": [1, 2], "expected": 3}}], "language": "python"}}'
+            f'{{"type": "code", "q": "Given an array of integers nums and an integer target, return indices of the two numbers that add up to target.\\nInput: nums=[2,7,11,15], target=9 → Output: [0,1]", '
+            f'"starter": "def solution(nums, target):\\n    pass", '
+            f'"test_cases": [{{"input": [[2,7,11,15], 9], "expected": [0,1]}}, {{"input": [[3,2,4], 6], "expected": [1,2]}}], "language": "python"}}'
             f']}}'
         )
     else:
         prompt = (
-            f"Generate a course-completion exam for a student who has studied the following topics:\n"
+            f"Generate a challenging course-completion exam for a student who has studied these topics:\n"
             f"{topic_list}\n\n"
-            f"Create exactly 10 multiple choice questions (type: 'mcq').\n"
-            f"Rules:\n"
-            f"- Test genuine understanding across all topics\n"
-            f"- 4 options each, one correct, plausible distractors\n"
+            f"Create exactly 10 multiple choice questions (type: 'mcq').\n\n"
+            f"Rules (make these HARD — this is a final exam, not a warm-up):\n"
+            f"- Test deep understanding, application, and analysis — NOT memorised definitions\n"
+            f"- Include scenario-based questions, trade-off comparisons, and edge cases\n"
+            f"- 4 options each, only one correct\n"
+            f"- All wrong options must be highly plausible — a student who half-understands should struggle\n"
             f"- 'answer' is the 0-based index of the correct option\n"
             f"- Vary correct answer positions\n"
-            f"- Cover a range of topics — don't cluster on one topic\n\n"
-            f"Return ONLY valid JSON, no markdown.\n"
+            f"- Cover a spread of topics — do not cluster on one topic\n\n"
+            f"Return ONLY valid JSON, no markdown, no extra text.\n"
             f"Format:\n"
             f'{{"questions": [{{"type": "mcq", "q": "...", "options": ["...", "...", "...", "..."], "answer": 0}}]}}'
         )

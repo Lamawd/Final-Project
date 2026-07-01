@@ -17,6 +17,8 @@ export default function CourseDetail() {
   const [gateModal, setGateModal] = useState(null); // { topic, prereqNames }
   const [courseQuizModal, setCourseQuizModal] = useState(null); // { questions, has_coding }
   const [courseComplete, setCourseComplete] = useState(false);
+  const [examPending, setExamPending] = useState(false);   // all topics done, exam not yet passed
+  const [loadingExam, setLoadingExam] = useState(false);
   const prevAllDone = useRef(false);
 
   useEffect(() => {
@@ -39,13 +41,24 @@ export default function CourseDetail() {
     const allDone = subtopics.every((t) => progress[t.id] === true);
     if (allDone && !prevAllDone.current && !courseComplete) {
       prevAllDone.current = true;
-      api.get(`/topics/course/${cid}/quiz`)
-        .then((r) => setCourseQuizModal({ questions: r.data.questions, has_coding: r.data.has_coding }))
-        .catch(() => {});
+      setExamPending(true);
+      // Auto-open the exam on first detection
+      openExam();
     } else if (!allDone) {
       prevAllDone.current = false;
+      setExamPending(false);
     }
-  }, [progress, subtopics, cid, courseComplete]);
+  }, [progress, subtopics, courseComplete]);
+
+  const openExam = () => {
+    setLoadingExam(true);
+    api.get(`/topics/course/${cid}/quiz`)
+      .then((r) => {
+        setCourseQuizModal({ questions: r.data.questions, has_coding: r.data.has_coding });
+      })
+      .catch(() => {})
+      .finally(() => setLoadingExam(false));
+  };
 
   if (!course) return <p className="loading">Course not found.</p>;
 
@@ -76,11 +89,81 @@ export default function CourseDetail() {
         <span className="course-icon-lg">
           <CourseIcon icon={course.icon} color={course.color} size={44} />
         </span>
-        <div>
+        <div style={{ flex: 1 }}>
           <h2>{course.title}</h2>
           <p>{course.description}</p>
         </div>
+        {courseComplete && (
+          <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13,
+            fontWeight: 700, color: "#065f46", background: "#d1fae5",
+            border: "1px solid #6ee7b7", borderRadius: 99, padding: "4px 14px", whiteSpace: "nowrap" }}>
+            <Check size={14} /> Completed
+          </span>
+        )}
+        {examPending && !courseComplete && (
+          <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13,
+            fontWeight: 700, color: "#92400e", background: "#fef3c7",
+            border: "1px solid #fcd34d", borderRadius: 99, padding: "4px 14px", whiteSpace: "nowrap" }}>
+            📝 Exam Required
+          </span>
+        )}
       </motion.div>
+
+      {/* Exam-pending banner */}
+      <AnimatePresence>
+        {examPending && !courseComplete && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            style={{
+              background: "linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)",
+              border: "2px solid #fcd34d",
+              borderRadius: 12,
+              padding: "16px 20px",
+              marginBottom: 20,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 16,
+              flexWrap: "wrap",
+            }}
+          >
+            <div>
+              <p style={{ fontWeight: 700, fontSize: "1rem", color: "#92400e", margin: 0 }}>
+                🎓 Almost there! Take the Final Exam to complete this course.
+              </p>
+              <p style={{ fontSize: "0.85rem", color: "#b45309", margin: "4px 0 0" }}>
+                You've finished all topics. Pass the exam (≥50%) to mark the course complete.
+              </p>
+            </div>
+            <button
+              className="btn btn-primary"
+              onClick={openExam}
+              disabled={loadingExam}
+              style={{ background: "#d97706", whiteSpace: "nowrap", minWidth: 130 }}
+            >
+              {loadingExam ? "Loading…" : "📝 Take Final Exam"}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Course complete banner */}
+      <AnimatePresence>
+        {courseComplete && (
+          <motion.div
+            className="all-done-banner"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            style={{ marginBottom: 20 }}
+          >
+            <Sparkles size={16} style={{ display: "inline", marginRight: 6 }} />
+            🎉 Congratulations! You've completed <strong>{course.title}</strong>!
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="roadmap">
         {subtopics.map((topic, i) => {
@@ -166,27 +249,12 @@ export default function CourseDetail() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {courseComplete && (
-          <motion.div
-            className="all-done-banner"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            style={{ marginTop: 24 }}
-          >
-            <Sparkles size={16} style={{ display: "inline", marginRight: 6 }} />
-            🎉 Congratulations! You've completed <strong>{course.title}</strong>!
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
         {courseQuizModal && (
           <CourseQuizModal
             questions={courseQuizModal.questions}
             hasCoding={courseQuizModal.has_coding}
             courseTitle={course.title}
-            onPass={() => { setCourseComplete(true); setCourseQuizModal(null); }}
+            onPass={() => { setCourseComplete(true); setExamPending(false); setCourseQuizModal(null); }}
             onClose={() => setCourseQuizModal(null)}
           />
         )}
@@ -286,7 +354,7 @@ function CourseQuizModal({ questions, hasCoding, courseTitle, onPass, onClose })
           </p>
           <div className="modal-actions">
             <button className="btn btn-primary" onClick={handleRetry}>Try Again</button>
-            <button className="btn" onClick={onClose} style={{ fontSize: 13 }}>Close — keep studying</button>
+            <button className="btn" onClick={onClose} style={{ fontSize: 13 }}>Go Back — keep studying</button>
           </div>
         </motion.div>
       </motion.div>
@@ -443,7 +511,7 @@ function CourseQuizModal({ questions, hasCoding, courseTitle, onPass, onClose })
             </button>
           )}
           <button className="btn" onClick={onClose} style={{ fontSize: 13 }}>
-            Close — come back later
+            Go Back — come back later
           </button>
         </div>
       </motion.div>
