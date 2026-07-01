@@ -6,7 +6,7 @@ from app.core.database import SessionLocal, init_db, engine
 from app.core.security import hash_password
 from app.models.models import (
     Topic, TopicPrerequisite, User, OnboardingQuestion, OnboardingAnswer,
-    Resource, ResourceStatus, Rating, Engagement, UserProgress
+    Resource, ResourceStatus, Rating, Engagement, UserProgress, Comment
 )
 
 # Run safe column migrations before init_db so existing DBs get new columns
@@ -40,6 +40,19 @@ def get_or_create_user(username, email, password, is_admin=False):
 admin = get_or_create_user("admin", "admin@opic.dev", "admin123", is_admin=True)
 alice = get_or_create_user("alice", "alice@opic.dev", "alice123")
 bob   = get_or_create_user("bob",   "bob@opic.dev",   "bob123")
+
+# Additional demo users for realistic ratings & comments
+extra_users_data = [
+    ("charlie", "charlie@opic.dev", "charlie123"),
+    ("diana",   "diana@opic.dev",   "diana123"),
+    ("ethan",   "ethan@opic.dev",   "ethan123"),
+    ("fiona",   "fiona@opic.dev",   "fiona123"),
+    ("george",  "george@opic.dev",  "george123"),
+    ("hannah",  "hannah@opic.dev",  "hannah123"),
+    ("ivan",    "ivan@opic.dev",    "ivan123"),
+    ("julia",   "julia@opic.dev",   "julia123"),
+]
+extra_users = [get_or_create_user(u, e, p) for u, e, p in extra_users_data]
 db.commit()
 
 # order_index hundreds digit = course id
@@ -357,54 +370,97 @@ for t_name, title, url, rtype in resources_data:
     resource_objs.append(r)
 db.commit()
 
-# Sample ratings from alice and bob (first 10 resources)
+# ── Rich randomised ratings + comments ──────────────────────────────────────
 from datetime import datetime, timedelta
 import random
 random.seed(42)
 
-alice_ratings = [
-    (0,5),(1,4),(2,5),(3,3),(4,5),(5,4),(6,2),(7,5),(8,4),(9,3),
-    (10,5),(11,4),(12,3),(13,5),(14,2),(15,4),(16,5),(17,3),(18,4),(19,5),
-    (20,2),(21,4),(22,5),(23,3),(24,5),(25,4),(26,2),(27,5),(28,3),(29,4),
-]
-bob_ratings = [
-    (4,4),(5,5),(6,3),(7,4),(8,2),(9,5),(10,4),(11,3),(12,5),(13,4),
-    (30,5),(31,3),(32,4),(33,2),(34,5),(35,4),(36,3),(37,5),(38,2),(39,4),
-]
-for idx, stars_val in alice_ratings:
-    if idx >= len(resource_objs): continue
-    r = resource_objs[idx]
-    if not db.query(Rating).filter_by(user_id=alice.id, resource_id=r.id).first():
-        db.add(Rating(user_id=alice.id, resource_id=r.id, stars=stars_val))
-    if not db.query(Engagement).filter_by(user_id=alice.id, resource_id=r.id).first():
-        db.add(Engagement(user_id=alice.id, resource_id=r.id,
-                          watch_completion=1.0 if stars_val >= 4 else 0.5,
-                          revisit_count=1 if stars_val == 5 else 0,
-                          completed=stars_val >= 3,
-                          completed_at=datetime.utcnow() - timedelta(days=random.randint(0, 29)) if stars_val >= 3 else None))
-for idx, stars_val in bob_ratings:
-    if idx >= len(resource_objs): continue
-    r = resource_objs[idx]
-    if not db.query(Rating).filter_by(user_id=bob.id, resource_id=r.id).first():
-        db.add(Rating(user_id=bob.id, resource_id=r.id, stars=stars_val))
-db.commit()
+all_raters = [alice, bob] + extra_users  # 10 users total
 
-# Demo activity heatmap: spread engagements across last 30 days
-# pattern index 0 = today, higher = further back; most days have activity
-activity_pattern = [3,2,0,4,2,1,0,3,3,2,1,0,0,4,2,3,1,2,0,3,2,1,3,0,2,4,2,1,3,2]
-resource_pool = resource_objs[10:]
-ri = 0
-for days_ago, count in enumerate(activity_pattern):
-    ts = datetime.utcnow() - timedelta(days=days_ago)
-    for _ in range(count):
-        if ri >= len(resource_pool):
-            break
-        r = resource_pool[ri]; ri += 1
-        if not db.query(Engagement).filter_by(user_id=alice.id, resource_id=r.id).first():
+# Realistic comment templates per star level
+COMMENTS_5 = [
+    "Absolutely loved this — crystal clear explanation!",
+    "Best resource I've found on this topic. Highly recommend.",
+    "Watched this twice. Every minute is worth it.",
+    "The examples made everything click. 5 stars easily.",
+    "Super well structured. Went from confused to confident.",
+    "This should be the first resource everyone sees for this topic.",
+    "Incredible depth without being overwhelming. Bookmarked.",
+    "The instructor's pace is perfect — not too fast, not too slow.",
+    "Covered all the edge cases I was wondering about. Great stuff.",
+    "This changed how I think about the topic entirely.",
+]
+COMMENTS_4 = [
+    "Really solid intro — a few parts could go deeper but overall great.",
+    "Good content, clear visuals. Could use more real-world examples.",
+    "Very helpful! The section on examples was especially well done.",
+    "Clean and concise. Would give 5 but the audio quality dips a bit.",
+    "Mostly excellent. Some slides are a bit text-heavy.",
+    "Great foundation builder. I followed up with the docs after this.",
+    "Well explained, though a bit short. Left wanting more.",
+    "Good pacing and examples. Minor nitpick: the end felt rushed.",
+]
+COMMENTS_3 = [
+    "Decent overview but skips some important nuances.",
+    "OK resource — not the best, not the worst. Does the job.",
+    "The first half is great; second half loses steam a bit.",
+    "Covers the basics fine but doesn't go beyond surface level.",
+    "Average quality. The official docs are actually more useful.",
+    "Watchable but nothing that stood out as exceptional.",
+]
+COMMENTS_2 = [
+    "Felt rushed and skipped over key concepts.",
+    "The examples were confusing and didn't match the explanations.",
+    "Outdated — some parts no longer apply to modern usage.",
+    "Hard to follow without prior knowledge. Needs more scaffolding.",
+    "Too superficial for anything beyond a 10-second intro.",
+]
+COMMENTS_1 = [
+    "Misleading title — barely covers what it promises.",
+    "Full of errors. Would not recommend.",
+    "The explanation contradicts itself in multiple places.",
+]
+
+COMMENT_MAP = {5: COMMENTS_5, 4: COMMENTS_4, 3: COMMENTS_3, 2: COMMENTS_2, 1: COMMENTS_1}
+
+def random_stars_biased():
+    """Realistic star distribution — skewed positive like real platforms."""
+    return random.choices([5, 4, 3, 2, 1], weights=[40, 30, 15, 10, 5])[0]
+
+def pick_comment(stars):
+    pool = COMMENT_MAP[stars]
+    return random.choice(pool)
+
+# Each user rates ~40-70% of all resources randomly, with some commenting
+for user in all_raters:
+    # Each user covers a "focus area" — they rate more resources in certain topics
+    sample_size = random.randint(int(len(resource_objs) * 0.35), int(len(resource_objs) * 0.65))
+    sampled = random.sample(resource_objs, sample_size)
+    for res in sampled:
+        if db.query(Rating).filter_by(user_id=user.id, resource_id=res.id).first():
+            continue
+        stars_val = random_stars_biased()
+        db.add(Rating(user_id=user.id, resource_id=res.id, stars=stars_val,
+                      reason=pick_comment(stars_val) if stars_val <= 2 else None))
+        # ~35% chance of leaving a comment (any star)
+        if random.random() < 0.35:
+            if not db.query(Comment).filter_by(user_id=user.id, resource_id=res.id).first():
+                db.add(Comment(
+                    user_id=user.id,
+                    resource_id=res.id,
+                    body=pick_comment(stars_val),
+                    created_at=datetime.utcnow() - timedelta(days=random.randint(0, 60)),
+                ))
+        # Engagement record
+        if not db.query(Engagement).filter_by(user_id=user.id, resource_id=res.id).first():
+            completed = stars_val >= 3
             db.add(Engagement(
-                user_id=alice.id, resource_id=r.id,
-                watch_completion=1.0, revisit_count=0, completed=True,
-                time_spent=random.randint(120, 900), completed_at=ts,
+                user_id=user.id, resource_id=res.id,
+                watch_completion=round(random.uniform(0.7, 1.0), 2) if completed else round(random.uniform(0.1, 0.6), 2),
+                revisit_count=random.randint(0, 2) if stars_val == 5 else 0,
+                completed=completed,
+                time_spent=random.randint(60, 1200) if completed else random.randint(10, 300),
+                completed_at=datetime.utcnow() - timedelta(days=random.randint(0, 45)) if completed else None,
             ))
 db.commit()
 
@@ -449,5 +505,7 @@ for q in q_objs:
 db.commit()
 
 db.close()
-print("Seeded. Admin: admin/admin123 | alice/alice123 | bob/bob123")
+all_user_names = "admin/alice/bob/" + "/".join(u for u, *_ in extra_users_data)
+print(f"Seeded. Users: {all_user_names}")
 print(f"Topics: {len(topics_data)} | Resources: {len(resources_data)}")
+print(f"Raters: {len(all_raters)} users with randomised ratings, comments & engagements")
