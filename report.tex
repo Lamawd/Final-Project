@@ -222,75 +222,73 @@ USTH  & University of Science and Technology of Hanoi \\
 
 \section{Context and Motivation}
 
-The amount of learning content available online today is almost overwhelming. Platforms like YouTube, Coursera, and Medium publish thousands of articles, videos, and tutorials every day \cite{coursera2023}. For a student trying to learn something new -- say, data structures or web development -- the real problem is not finding content; it is figuring out \textit{what to learn, in what order, and what is actually worth their time}.
+There is no shortage of learning material online. YouTube, Coursera, and Medium alone publish thousands of tutorials, articles, and videos every week \cite{coursera2023}. For a student trying to pick up a new topic -- say, data structures or web development -- the actual problem is not finding content. It is figuring out what to study first, what order makes sense, and which of the hundred results that come up are actually worth the time.
 
-The challenge of information overload in online education has been well documented. Drachsler and Greller \cite{drachsler2016} described this as the ``paradox of choice'' in technology-enhanced learning: the abundance of resources does not guarantee better learning outcomes and can in fact increase cognitive load and learner disorientation. Burke \cite{burke2002} similarly identified the inability to surface personally relevant content as one of the central unsolved problems in web-based learning environments.
+This problem has been studied in the e-learning literature. Drachsler and Greller \cite{drachsler2016} call it the ``paradox of choice'': more resources does not mean better learning, and too many options can increase cognitive load and leave learners more confused than when they started. Burke \cite{burke2002} made a similar point -- web-based learning environments have long struggled to show people content that is relevant to them specifically, rather than just popular in general.
 
-Recommender systems have been proposed as a solution to this problem since the mid-1990s, beginning with the seminal GroupLens project \cite{resnick1994}, which applied collaborative filtering to Usenet news articles. Since then, collaborative filtering has become the dominant paradigm for personalised recommendation \cite{koren2009}, deployed at scale by commercial platforms such as Netflix, Spotify, and Amazon. Its application to educational content, however, remains less mature, with most academic platforms still relying on manually curated content hierarchies \cite{tang2015}.
+Recommender systems have been one answer to this since the mid-1990s, starting with the GroupLens project \cite{resnick1994}, which applied collaborative filtering to Usenet articles. Collaborative filtering has since become the standard approach for personalised recommendation \cite{koren2009} and is used by Netflix, Spotify, and Amazon at scale. Its use in education, however, is less developed -- most academic platforms still depend on manually curated course structures \cite{tang2015}.
 
-This is the problem that motivated the development of \textbf{Opic}. The name comes from the word \textit{topic} -- the fundamental unit of learning in the system. Opic is a web-based learning platform that organises knowledge into structured topic roadmaps, lets the community contribute and rate resources, and uses a recommendation engine to surface relevant materials for each individual user based on their behaviour and interests.
+Opic was built to address this gap. The name comes from \textit{topic}, the core unit of learning in the system. It is a web-based platform that organises content into structured topic roadmaps, lets users submit and rate resources, and uses a recommendation engine to surface materials relevant to each person based on how they interact with the platform.
 
-The system was built with university students in mind, particularly those studying Information and Communication Technology (ICT), Data Science (DS), and Business Information Technology (BIT), where self-directed learning is common and the volume of online material can be disorienting. Self-directed learning in higher education has been extensively studied \cite{zimmerman2002}, with evidence suggesting that learners benefit significantly from systems that scaffold their path through a subject domain \cite{brusilovsky2007}.
+The target audience is university students, particularly in ICT, Data Science, and BIT programmes at USTH, where students are expected to do a lot of self-directed study and the volume of available material can be hard to navigate \cite{zimmerman2002,brusilovsky2007}.
 
 \section{Objectives}
 
-The primary goal of this project was to design and build a functional, deployable learning platform that addresses three core problems a student faces when navigating online learning materials:
+This project set out to build a working, deployable learning platform that tackles three specific problems students face:
 
 \begin{enumerate}
-  \item \textbf{Navigation:} Not knowing what to learn first or next.
-  \item \textbf{Quality filtering:} Not knowing which resources are actually good.
-  \item \textbf{Personalisation:} Receiving the same generic content regardless of background or interests.
+  \item \textbf{Navigation} -- not knowing what to study or in what order.
+  \item \textbf{Quality} -- not knowing which resources are actually good.
+  \item \textbf{Personalisation} -- getting the same results as everyone else regardless of background.
 \end{enumerate}
 
-These three challenges are addressed respectively through structured topic roadmaps, a community-driven rating and admin-review pipeline, and a user-based collaborative filtering (UBCF) recommendation engine. The UBCF approach was chosen over content-based filtering because it can leverage the collective judgement of many users rather than requiring expert content tagging, and over matrix factorisation because it is interpretable and does not require offline training \cite{herlocker2004}. The cold-start problem -- the inability to recommend to new users with no history -- is handled through an onboarding quiz that seeds the system with topic-level preference signals \cite{schein2002}.
+These are addressed through topic roadmaps with prerequisite links, a community submission and admin review pipeline, and a user-based collaborative filtering engine. UBCF was chosen over content-based filtering (which needs expert tagging) and matrix factorisation (which requires offline training) because it is simpler, interpretable, and works on live data \cite{herlocker2004}. The cold-start problem for new users with no history is handled through an onboarding quiz \cite{schein2002}.
 
 \section{Expected Outcome}
 
-The following outcomes were achieved by the end of the project:
+By the end of the project, the following were working and deployed:
 
 \begin{itemize}
-  \item A fully deployed, publicly accessible web application where any user can register, complete the onboarding quiz, browse structured topic roadmaps, and access curated resources.
-  \item A working recommendation engine that provides personalised resource suggestions from the first login (via onboarding cold-start) and improves as users rate and complete more content.
-  \item A complete admin pipeline where content can be submitted by any registered user, reviewed by admins, and published or rejected -- maintaining content quality without manual curation of the entire library.
-  \item A progress tracking system that allows users to mark topics as completed and view their learning activity over a 30-day period.
-  \item A JWT-based authentication system with a secure password reset flow \cite{ietfjwt}, protecting all state-mutating endpoints behind role-aware access control. Passwords are stored as bcrypt hashes following OWASP recommendations \cite{owasp}.
-  \item A clean client-server deployment on free-tier cloud infrastructure (Vercel for the frontend, Render for the backend and database), with CI/CD triggered automatically on every push to the main branch.
+  \item A live web application where users can register, take the onboarding quiz, browse topic roadmaps, and access curated resources.
+  \item A recommendation engine that gives useful suggestions from day one (via the onboarding quiz cold-start) and gets better as users rate and complete resources.
+  \item An admin content pipeline: users submit resources, admins approve or reject them, and only approved resources appear on topic pages.
+  \item Topic-level progress tracking with a 30-day activity heatmap.
+  \item JWT authentication with a password reset flow \cite{ietfjwt}. Passwords are stored as bcrypt hashes per OWASP guidelines \cite{owasp}.
+  \item Deployment on free-tier cloud infrastructure (Vercel for frontend, Render for backend and database) with automatic redeploy on every git push.
 \end{itemize}
 
 \section{Desired Features and Design Decisions}
 
-At the start of the project, the following features were identified as essential requirements. Each feature directly informed an architectural and design decision that is elaborated in Chapters 4 and 5.
+The features listed below were agreed on at the start of the project. Each one drove specific implementation decisions covered in Chapters 4 and 5.
 
 \begin{itemize}
-  \item \textbf{AI-generated knowledge quiz} -- drove the design of the \texttt{GET /topics/\{id\}/quiz} endpoint, the Gemini API integration \cite{gemini2024}, and the \texttt{QuizModal} component on the topic detail page. The decision to gate topic completion behind a quiz was motivated by research showing that retrieval practice (testing oneself on material) substantially improves retention compared to passive re-reading \cite{roediger2006}.
-  \item \textbf{User registration, login, and JWT-based authentication} -- drove the design of the \texttt{users} table, the \texttt{/auth} API module, and the React Context-based auth state management on the frontend.
-  \item \textbf{Structured topic roadmaps with prerequisite relationships} -- drove the design of the \texttt{topics} and \texttt{topic\_prerequisites} tables and the topic detail page layout. Prerequisite sequencing is a well-established practice in intelligent tutoring systems \cite{brusilovsky2007}.
-  \item \textbf{Community resource submission} -- drove the resource submission form and the \texttt{resources} table with a \texttt{status} field to gate visibility. Crowdsourced content curation has been shown to be effective at surfacing high-quality materials at scale \cite{anderson2012}.
-  \item \textbf{Admin review workflow} -- drove the dedicated admin review page and the \texttt{POST /resources/\{id\}/review} endpoint with role checking.
-  \item \textbf{Star ratings and engagement tracking} -- drove the \texttt{ratings} and \texttt{engagements} tables and the engagement-score formula used in the recommender. Combining explicit ratings with implicit signals such as time spent and completion rate is a standard technique for improving recommender accuracy \cite{hu2008}.
-  \item \textbf{Personalised recommendations using collaborative filtering} -- drove the design of the recommender service, including the user-resource matrix, cosine similarity computation \cite{salton1988}, and Bayesian average popularity score to handle the cold-resource problem \cite{imdb_bayes}.
-  \item \textbf{Cold-start onboarding quiz} -- drove the \texttt{onboarding\_questions} and \texttt{onboarding\_answers} tables and the topic-boosting logic in the cold-start fallback. The cold-start problem is one of the most studied open challenges in recommender systems research \cite{schein2002,lam2008}.
-  \item \textbf{Progress tracking per topic} -- drove the \texttt{user\_progress} table and the progress page with the 30-day activity heatmap. Visual progress indicators have been shown to increase learner motivation and persistence \cite{hattie2007}.
-  \item \textbf{Admin dashboard for user and content management} -- drove the admin user management page and the safeguard that prevents deletion of admin accounts.
+  \item \textbf{AI knowledge quiz} -- a quiz generated by the Gemini API \cite{gemini2024} shown when a user tries to mark a topic complete. Based on research showing that self-testing improves retention more than re-reading \cite{roediger2006}.
+  \item \textbf{Registration, login, JWT auth} -- standard auth flow with tokens stored client-side and sent on every request.
+  \item \textbf{Topic roadmaps with prerequisites} -- topics are ordered and linked, so the system can tell a user what they should do first \cite{brusilovsky2007}.
+  \item \textbf{Community resource submission} -- any logged-in user can submit a link; admins review it before it goes live. Crowdsourced curation works well at scale \cite{anderson2012}.
+  \item \textbf{Admin review} -- a dedicated page for approving or rejecting pending submissions.
+  \item \textbf{Star ratings and engagement tracking} -- explicit ratings combined with implicit signals (time spent, completion, revisits) feed into the recommender score \cite{hu2008}.
+  \item \textbf{Collaborative filtering} -- user-resource matrix with cosine similarity \cite{salton1988} and a Bayesian average to handle resources with few ratings \cite{imdb_bayes}.
+  \item \textbf{Onboarding quiz cold-start} -- new users answer a few questions that are mapped to topics; matching resources get a score boost until the user builds up a rating history \cite{schein2002,lam2008}.
+  \item \textbf{Progress tracking} -- mark topics done, view a 30-day heatmap. Visual progress feedback helps with motivation \cite{hattie2007}.
+  \item \textbf{Admin user management} -- list all users, delete non-admin accounts.
 \end{itemize}
-
-These design decisions are described in full in the System Architecture (Chapter 4) and Database Design (Chapter 5) chapters.
 
 \section{Thesis Structure}
 
-The remainder of this report is organised as follows. Chapter 2 presents the functional and non-functional requirements alongside the use case model. Chapter 3 describes the development methodology and testing strategy. Chapter 4 covers the system architecture and deployment setup. Chapter 5 details the database design. Chapter 6 walks through the implementation of each key use case. Chapter 7 lists the tools and libraries used. Chapter 8 presents the results and evaluates the system against its requirements. Chapter 9 discusses challenges and limitations. Chapter 10 concludes with a summary and directions for future work.
+Chapter 2 covers requirements and use cases. Chapter 3 describes the development process and testing. Chapter 4 covers architecture and deployment. Chapter 5 is the database design. Chapter 6 walks through implementation of the main features. Chapter 7 lists the tools used. Chapter 8 presents results. Chapter 9 discusses issues and limitations. Chapter 10 concludes.
 
 % ============================================================
 % CHAPTER 2 -- REQUIREMENT ANALYSIS
 % ============================================================
 \chapter{Requirement Analysis}
 
-This chapter defines the complete set of requirements for the Opic platform. Section~\ref{sec:func-req} lists the functional requirements. Section~\ref{sec:user-req} captures the requirements from each user role's perspective. Section~\ref{sec:nonfunc-req} covers non-functional constraints. Section~\ref{sec:usecases} presents the use case model with diagrams and detailed use case specifications.
+This chapter lists the requirements for the Opic platform and presents the use case model. Section~\ref{sec:func-req} covers functional requirements. Section~\ref{sec:user-req} describes what each user role needs from the system. Section~\ref{sec:nonfunc-req} covers non-functional constraints. Section~\ref{sec:usecases} presents use case diagrams and detailed specifications.
 
 \section{Overall Functional Requirements}
 \label{sec:func-req}
 
-Table~\ref{tab:func-req} summarises the fourteen functional requirements identified during the initial design phase. These requirements were derived directly from the desired features described in Chapter 1 and served as the acceptance criteria for the final evaluation in Chapter 8.
+Table~\ref{tab:func-req} lists the fifteen functional requirements defined at the start of the project. These came directly from the feature decisions in Chapter 1 and were used as the acceptance criteria in Chapter 8.
 
 \begin{longtable}{p{0.08\textwidth} p{0.35\textwidth} p{0.45\textwidth}}
 \caption{Functional Requirements}\label{tab:func-req}\\
@@ -325,33 +323,33 @@ Each requirement is traceable to a specific implementation component: the use ca
 \section{User Requirements}
 \label{sec:user-req}
 
-The system has two distinct user roles: \textit{Learner} (a regular registered user) and \textit{Administrator}. The requirements below reflect the goals and expectations of each role, gathered through informal interviews and self-directed testing during development.
+There are two user roles in the system: \textit{Learner} (any registered user) and \textit{Administrator}. The needs below were gathered through informal testing with classmates during development.
 
 \subsection{Learner (Regular User)}
 
-The learner's primary interaction with the platform revolves around discovering, consuming, and rating learning resources. The key needs expressed during requirement gathering were:
+Learners use the platform to find and consume learning resources. The main things they wanted:
 
 \begin{itemize}
-  \item I want to see a clear path of what topics to study and in what order.
-  \item I want to rate resources so I can remember which ones were useful.
-  \item I want the platform to suggest resources I have not seen yet, based on what I have done.
-  \item I want to track my progress and see how much of a course I have completed.
-  \item I want to contribute resources I found useful so other learners can benefit.
+  \item A clear path showing what topics to study and in what order.
+  \item A way to rate resources and record which ones were useful.
+  \item Suggestions for resources they have not seen yet, based on what they have already done.
+  \item A view of how much of a course they have completed.
+  \item A way to submit useful resources so others can benefit too.
 \end{itemize}
 
-These needs map directly to FR-04, FR-07, FR-11, FR-09, and FR-06 respectively.
+These map to FR-04, FR-07, FR-11, FR-09, and FR-06.
 
 \subsection{Administrator}
 
-The administrator's role is to maintain the quality of the content library and the integrity of the user base. The requirements identified for this role were:
+Admins keep the content and user base in order. Their main needs:
 
 \begin{itemize}
-  \item I want to review submitted resources before they go live to maintain quality.
-  \item I want to see all registered users and be able to remove bad actors.
-  \item I want the platform to prevent me from accidentally deleting admin accounts.
+  \item Review submitted resources before they go live.
+  \item See the list of registered users and remove accounts if needed.
+  \item Not accidentally delete other admin accounts.
 \end{itemize}
 
-These needs map to FR-12, FR-13, and the guard condition in the admin user management endpoint.
+These map to FR-12, FR-13, and the guard condition in the delete user endpoint.
 
 \section{Non-Functional Requirements}
 \label{sec:nonfunc-req}
@@ -398,23 +396,21 @@ Before examining the diagrams and detailed specifications, Table~\ref{tab:uc-sum
 \textbf{ID} & \textbf{Name} & \textbf{Actor} & \textbf{Related FR} \\
 \midrule
 \endhead
-UC-01 & Register Account & Learner & FR-01 \\
-UC-02 & Log In & Learner & FR-02 \\
-UC-03 & Reset Password & Learner & FR-03 \\
-UC-04 & Rate a Resource & Learner & FR-07, FR-11 \\
-UC-05 & Submit a Resource & Learner & FR-06 \\
-UC-06 & Track Topic Progress & Learner & FR-09 \\
-UC-07 & View Personalised Recommendations & Learner & FR-11, FR-10 \\
-UC-08 & Admin Review Submission & Admin & FR-12 \\
-UC-09 & Manage Users & Admin & FR-13 \\
-UC-10 & Complete Onboarding Quiz & Learner & FR-10, FR-11 \\
-UC-11 & Complete AI Knowledge Quiz & Learner & FR-15 \\
+UC-01 & Login & Learner, Admin & FR-02 \\
+UC-02 & Register & Learner, Admin & FR-01 \\
+UC-03 & Forgot Password & Learner & FR-03 \\
+UC-04 & Manage Topics & Learner & FR-04, FR-05, FR-06, FR-07 \\
+UC-05 & Track Progress & Learner & FR-08, FR-09, FR-15 \\
+UC-06 & Receive Suggestions & Learner & FR-10, FR-11, FR-14 \\
+UC-07 & Manage Profile & Learner, Admin & FR-02 \\
+UC-08 & Moderate Content & Admin & FR-12 \\
+UC-09 & Moderate Users & Admin & FR-13 \\
 \bottomrule
 \end{longtable}
 
 \subsection{Overall Use Case Diagram}
 
-Figure~\ref{fig:ucd-overall} shows the complete use case diagram for the Opic system, illustrating the interactions between the two actors and all use cases.
+Figure~\ref{fig:ucd-overall} shows the use case diagram for Opic. There are two actors: \textit{Learner} and \textit{Admin}. Both share the Login use case. The Learner has four main groups of functionality: Manage Topics (view courses and topics, submit and rate resources, leave comments), Track Progress (mark topics complete, take the AI quiz, view the activity heatmap), Receive Suggestions (take the onboarding quiz, view the home feed), and Manage Profile. The Admin can Moderate Content (approve or reject submissions, view all submissions) and Moderate Users (view and delete accounts).
 
 \begin{figure}[H]
 \centering
@@ -422,8 +418,6 @@ Figure~\ref{fig:ucd-overall} shows the complete use case diagram for the Opic sy
 \caption{Overall Use Case Diagram}
 \label{fig:ucd-overall}
 \end{figure}
-
-The diagram highlights the Learner role as the primary actor, interacting with the majority of use cases, while the Admin role is responsible for content governance and user management.
 
 \subsection{Use Case Diagram -- Authentication}
 
@@ -517,44 +511,42 @@ Together, these use cases define the interaction boundaries of the system. The n
 % ============================================================
 \chapter{Methodology}
 
-This chapter describes the development approach, version control strategy, and testing methodology used throughout the project. The choices made here had a direct impact on how quickly integration issues were identified and resolved during the ten-week build.
+This chapter covers how the project was developed, how the code was managed, and how it was tested.
 
 \section{Development Approach}
 
-This project was developed over approximately three months, from early April to late June 2026. Rather than following a strict waterfall model, development was organised into an \textbf{iterative, feature-driven} process. Work progressed in phases, each centred on a specific feature group, so that each feature was working end-to-end before the next one began. Integration issues were therefore caught early rather than accumulating into a large unresolved backlog at the end.
+Development ran from early April to late June 2026, roughly three months. Instead of designing everything upfront and building it all at the end, the work was split into feature phases. Each phase had a clear goal -- get one group of features working end-to-end -- before moving to the next. This meant bugs and integration problems showed up early when they were still easy to fix, rather than piling up at the end.
 
-Table~\ref{tab:timeline} summarises the six phases of development and the work completed in each.
+Table~\ref{tab:timeline} shows what was done each phase.
 
 \begin{longtable}{p{0.25\textwidth} p{0.65\textwidth}}
 \caption{Development Timeline}\label{tab:timeline}\\
 \toprule
 \textbf{Period} & \textbf{Work Done} \\
 \midrule
-April (Weeks 1--2) & Project setup, database schema design, authentication (register, login, JWT) \\
-April (Weeks 3--4) & Topic and course structure, prerequisite relationships, seed data \\
-May (Weeks 1--2) & Resource upload, admin review workflow, ratings system \\
-May (Weeks 3--4) & Engagement tracking, recommendation engine (UBCF + Bayesian average) \\
-June (Weeks 1--2) & Onboarding quiz, cold-start fallback, progress tracking, home feed \\
-June (Weeks 3--4) & UI polish, bug fixes, deployment to Render and Vercel, report writing \\
+April (Weeks 1--2) & Project setup, database schema, auth (register, login, JWT) \\
+April (Weeks 3--4) & Topics, courses, prerequisite links, seed data \\
+May (Weeks 1--2) & Resource upload, admin review, ratings \\
+May (Weeks 3--4) & Engagement tracking, recommendation engine \\
+June (Weeks 1--2) & Onboarding quiz, cold-start, progress tracking, home feed \\
+June (Weeks 3--4) & UI, bug fixes, deployment, report \\
 \bottomrule
 \end{longtable}
 
-The iterative approach also meant that the database schema was informed by real usage patterns observed during development, rather than being designed entirely upfront. The \texttt{version} column on the \texttt{resources} table, for example, was added during the May review phase when it became clear that resource update support would be needed in a future iteration.
+The schema also evolved during development. The \texttt{version} column on resources, for example, was added in May when it became clear that tracking resource updates might be useful later.
 
 \section{Version Control}
 
-Git was used throughout the project with commits grouped by feature. The repository is hosted on GitHub, which also serves as the deployment trigger -- both the backend (Render) and frontend (Vercel) automatically redeploy on every push to the \texttt{main} branch. This created a simple but effective CI/CD pipeline. A GitHub Actions workflow additionally runs the automated test suite on every push, preventing regressions from being merged undetected.
+Git was used throughout, with commits organised by feature. The repository is on GitHub. Both Render (backend) and Vercel (frontend) are configured to auto-deploy on every push to \texttt{main}, so the live site always reflects the latest version. A GitHub Actions workflow also runs the test suite on every push.
 
 \section{Testing Strategy}
 
-Two layers of testing were applied to verify correctness:
+Testing was done at two levels:
 
 \begin{enumerate}
-  \item \textbf{Automated unit tests:} Written using \texttt{pytest} with \texttt{httpx} for the FastAPI test client. Tests cover authentication flows (registration, login, token validation) and the recommendation algorithm (correct scoring formula, cold-start fallback behaviour).
-  \item \textbf{Manual end-to-end testing:} The deployed system was tested by multiple users across different devices and browsers. Reported issues -- including the CORS middleware ordering bug and the missing React Router entry for \texttt{/topics} -- were resolved before the final submission. These incidents are documented in detail in Chapter 9.
+  \item \textbf{Automated tests} using \texttt{pytest} and the FastAPI test client. These cover the auth flows and the recommender algorithm (scoring formula and cold-start fallback).
+  \item \textbf{Manual end-to-end testing} on the deployed site, done by several classmates across different devices and browsers. This caught two bugs -- a CORS ordering issue and a missing route -- that are documented in Chapter 9.
 \end{enumerate}
-
-With the methodology in place, the following chapters describe the architectural and design decisions that resulted from it.
 
 % ============================================================
 % CHAPTER 4 -- SYSTEM ARCHITECTURE
@@ -1123,7 +1115,7 @@ The quiz presents one question at a time. Figure~\ref{fig:quiz-flow} shows the c
 
 \begin{figure}[H]
 \centering
-\IfFileExists{quiz_flow.png}{\includegraphics[width=0.72\textwidth]{quiz_flow.png}}{%
+\IfFileExists{quiz_flow.png}{\includegraphics[width=0.38\textwidth]{quiz_flow.png}}{%
 \begin{tikzpicture}[
   startstop/.style={draw, rounded corners=10pt, fill=indigo!15, minimum width=3.2cm, minimum height=0.6cm, font=\small, align=center},
   process/.style={draw, fill=blue!8, minimum width=3.2cm, minimum height=0.6cm, font=\small, align=center},
@@ -1458,30 +1450,28 @@ These limitations represent natural starting points for future work, as describe
 
 \section{Conclusion}
 
-Opic was designed to solve a real and familiar problem: the difficulty of navigating a vast sea of online learning material as a student. The platform was successfully built and deployed within the planned timeframe, delivering all fourteen intended functional requirements.
+Opic started as a response to a straightforward problem: as a student studying ICT, it is genuinely hard to figure out what to learn next and whether a given tutorial is worth your time. The platform was built and deployed within the planned three months and ended up meeting all fifteen functional requirements.
 
-The most technically interesting component is the recommendation engine, which combines user-based collaborative filtering with a Bayesian average popularity score and a cold-start fallback driven by onboarding quiz answers. The result is a system that provides useful recommendations even for new users and improves meaningfully as users interact with more content.
+The part I found most interesting to build was the recommendation engine. Getting something useful out of a sparse rating matrix -- and doing it in a way that still works for brand-new users with no history -- required combining collaborative filtering with a Bayesian popularity score and an onboarding quiz cold-start. The result is not perfect, but it does produce noticeably different recommendations for different users, which was the goal.
 
-The project also demonstrated the value of a clean architecture. Separating the frontend, backend, and database into independent deployable units made it straightforward to host the entire system on free-tier cloud services without any infrastructure cost, and allowed each layer to be updated and redeployed independently throughout the development cycle.
+The architectural choice to keep the frontend and backend completely separate also paid off. Being able to push changes to the Vercel frontend without touching the Render backend (and vice versa) made the last few weeks of bug fixing much more manageable.
 
 \section{Future Work}
 
-Given more time, the following improvements would be the most impactful:
+There are a few things I would prioritise if development continued:
 
 \begin{enumerate}
-  \item \textbf{JWT refresh tokens:} The current implementation issues a single access token that expires after a fixed period, silently logging out the user. A refresh token flow would maintain sessions more gracefully without compromising security.
+  \item \textbf{JWT refresh tokens:} Right now users get silently logged out when their token expires. A refresh token would fix this without weakening security.
 
-  \item \textbf{Email notifications for review decisions:} Notify users automatically when their resource submission is approved or rejected. The SMTP infrastructure already exists in the codebase and could be reused with minimal effort.
+  \item \textbf{Email notifications for review outcomes:} When a submitted resource is approved or rejected, the submitter gets no notification. The SMTP code is already there from the password reset flow -- this would not take long to add.
 
-  \item \textbf{Recommendation caching:} The recommendation engine currently rebuilds the full user-resource matrix on every API call. Pre-computing and caching the matrix on a fixed schedule (e.g.\ every 30 minutes) would significantly reduce response times at scale.
+  \item \textbf{Cache the recommendation matrix:} The engine rebuilds the full user-resource matrix on every request. For the current number of users that is fine, but it would not scale. Pre-computing it every 30 minutes would help a lot.
 
-  \item \textbf{Hybrid content-based filtering:} Adding content-based features -- resource type, topic tags, title keywords -- would improve recommendations for new resources that have not yet been rated by many users.
+  \item \textbf{Content-based features:} Right now recommendations are purely based on user behaviour. Adding resource type, topic tags, or title keywords would help with new resources that have not been rated yet.
 
-  \item \textbf{Pagination:} Several endpoints return all records in a single response. Adding limit/offset pagination would be necessary for a production-scale content library.
+  \item \textbf{Pagination:} Several endpoints return every record in one go. This is fine for a demo but would need pagination for a real deployment.
 
-  \item \textbf{Mobile application:} A React Native version of the frontend would provide a better experience for users who prefer to learn on their phones.
-
-  \item \textbf{Analytics dashboard:} An admin view showing platform-wide statistics -- most popular topics, average completion rate, rating distributions, and daily active users -- would help administrators make data-driven content decisions.
+  \item \textbf{Admin analytics:} A dashboard showing popular topics, average completion rates, and daily active users would help admins make better decisions about what content to prioritise.
 \end{enumerate}
 
 % ============================================================
