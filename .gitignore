@@ -40,11 +40,9 @@ frontend/.env.production
 Thumbs.db
 
 # Report and thesis assets (not part of source code submission)
-report.tex
 report*.pdf
 main.pdf
 *.png
-*.pdf
 Comvis.pdf
 
 # Render/Vercel deployment noise (accidentally created files)
