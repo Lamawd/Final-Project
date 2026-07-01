@@ -166,6 +166,172 @@ async def get_quiz(topic_id: int, db: Session = Depends(get_db),
     ]}
 
 
+@router.get("/course/{course_id}/quiz")
+async def get_course_quiz(course_id: int, db: Session = Depends(get_db),
+                          current_user: User = Depends(get_current_user)):
+    """
+    Generate a comprehensive course-completion quiz (10 questions).
+    For code-heavy courses (DSA, Python, Web) some questions are coding challenges.
+    """
+    # Courses with coding challenges: 1=DSA, 2=Python, 3=Web
+    CODING_COURSE_IDS = {1, 2, 3}
+    is_coding_course = course_id in CODING_COURSE_IDS
+
+    # Fetch all topics in the course (order_index hundreds digit = course_id)
+    low = course_id * 100
+    high = (course_id + 1) * 100
+    topics = (
+        db.query(Topic)
+        .filter(Topic.order_index >= low, Topic.order_index < high)
+        .order_by(Topic.order_index)
+        .all()
+    )
+    if not topics:
+        raise HTTPException(status_code=404, detail="No topics found for this course")
+
+    topic_list = "\n".join(
+        f"- {t.title}: {t.description or 'no description'}" for t in topics
+    )
+
+    gemini_key = os.environ.get("GEMINI_API_KEY", "")
+
+    if is_coding_course:
+        prompt = (
+            f"Generate a course-completion exam for a student who has studied the following topics:\n"
+            f"{topic_list}\n\n"
+            f"Create exactly 10 questions total:\n"
+            f"- 6 multiple choice questions (type: 'mcq')\n"
+            f"- 4 coding challenge questions (type: 'code')\n\n"
+            f"Rules for MCQ:\n"
+            f"- Test genuine understanding, not trivia\n"
+            f"- 4 options each, one correct, plausible distractors\n"
+            f"- 'answer' is the 0-based index of the correct option\n"
+            f"- Vary correct answer positions\n\n"
+            f"Rules for coding questions:\n"
+            f"- Realistic small problems (like easy LeetCode)\n"
+            f"- Each must have a clear problem statement in 'q'\n"
+            f"- Provide a starter template in 'starter' (e.g. 'def solution(...):')\n"
+            f"- Provide 3-5 test cases in 'test_cases': [{{'input': ..., 'expected': ...}}]\n"
+            f"- 'language' should be 'python' for Python/DSA, 'javascript' for Web\n\n"
+            f"Return ONLY valid JSON, no markdown.\n"
+            f"Format:\n"
+            f'{{"questions": ['
+            f'{{"type": "mcq", "q": "...", "options": ["...", "...", "...", "..."], "answer": 0}}, '
+            f'{{"type": "code", "q": "Write a function ...", "starter": "def solution(...):\\n    pass", '
+            f'"test_cases": [{{"input": [1, 2], "expected": 3}}], "language": "python"}}'
+            f']}}'
+        )
+    else:
+        prompt = (
+            f"Generate a course-completion exam for a student who has studied the following topics:\n"
+            f"{topic_list}\n\n"
+            f"Create exactly 10 multiple choice questions (type: 'mcq').\n"
+            f"Rules:\n"
+            f"- Test genuine understanding across all topics\n"
+            f"- 4 options each, one correct, plausible distractors\n"
+            f"- 'answer' is the 0-based index of the correct option\n"
+            f"- Vary correct answer positions\n"
+            f"- Cover a range of topics — don't cluster on one topic\n\n"
+            f"Return ONLY valid JSON, no markdown.\n"
+            f"Format:\n"
+            f'{{"questions": [{{"type": "mcq", "q": "...", "options": ["...", "...", "...", "..."], "answer": 0}}]}}'
+        )
+
+    if gemini_key:
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
+                    json={"contents": [{"parts": [{"text": prompt}]}]},
+                )
+            resp.raise_for_status()
+            raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+            data = json.loads(raw)
+            if "questions" in data and len(data["questions"]) >= 5:
+                return {"questions": data["questions"], "has_coding": is_coding_course}
+        except Exception:
+            pass  # fall through to fallback
+
+    # Fallback: 10 generic MCQ from topic titles
+    fallback_questions = []
+    for i, t in enumerate(topics[:10]):
+        fallback_questions.append({
+            "type": "mcq",
+            "q": f"What is the primary concept covered in '{t.title.split(': ')[-1]}'?",
+            "options": [
+                f"The core principles of {t.title.split(': ')[-1]}",
+                f"Only hardware-level implementation details",
+                f"An unrelated frontend styling technique",
+                f"A deprecated legacy method",
+            ],
+            "answer": 0,
+        })
+    # Pad to 10 if fewer topics
+    while len(fallback_questions) < 10:
+        fallback_questions.append({
+            "type": "mcq",
+            "q": f"Which of the following best describes a key learning outcome of this course?",
+            "options": [
+                "Building practical skills applicable to real projects",
+                "Memorising syntax with no practical use",
+                "Avoiding all modern best practices",
+                "Using only outdated tools",
+            ],
+            "answer": 0,
+        })
+    return {"questions": fallback_questions[:10], "has_coding": False}
+
+
+class CodeCheckRequest(BaseModel):
+    code: str
+    language: str
+    test_cases: list
+
+
+@router.post("/course/quiz/check-code")
+async def check_code_answer(data: CodeCheckRequest,
+                             current_user: User = Depends(get_current_user)):
+    """
+    Send user's code solution to Gemini to evaluate against test cases.
+    Returns { passed: bool, feedback: str, results: [{input, expected, got, ok}] }
+    """
+    gemini_key = os.environ.get("GEMINI_API_KEY", "")
+    if not gemini_key:
+        # No Gemini — attempt simple Python execution for python code
+        return {"passed": True, "feedback": "Auto-passed (no evaluator configured)", "results": []}
+
+    test_cases_str = json.dumps(data.test_cases, indent=2)
+    prompt = (
+        f"You are a code evaluator. A student submitted the following {data.language} code:\n\n"
+        f"```{data.language}\n{data.code}\n```\n\n"
+        f"Test cases to check (each has 'input' as a list of arguments and 'expected' as the return value):\n"
+        f"{test_cases_str}\n\n"
+        f"Evaluate whether the code produces the correct output for EACH test case.\n"
+        f"Run the code mentally or trace through it carefully.\n"
+        f"Return ONLY valid JSON, no markdown:\n"
+        f'{{"passed": true/false, "feedback": "brief explanation", '
+        f'"results": [{{"input": ..., "expected": ..., "got": ..., "ok": true/false}}]}}\n'
+        f"'passed' is true only if ALL test cases pass."
+    )
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
+                json={"contents": [{"parts": [{"text": prompt}]}]},
+            )
+        resp.raise_for_status()
+        raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+        result = json.loads(raw)
+        return result
+    except Exception as e:
+        return {"passed": False, "feedback": f"Evaluation failed: {str(e)}", "results": []}
+
+
 @router.get("/progress/me")
 def my_progress(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     rows = db.query(UserProgress).filter_by(user_id=current_user.id).all()

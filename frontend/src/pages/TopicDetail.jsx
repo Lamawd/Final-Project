@@ -377,6 +377,7 @@ export default function TopicDetail() {
                   toggleReviews={toggleReviews} toggleComments={toggleComments}
                   submitComment={submitComment} deleteComment={deleteComment}
                   setReviewData={setReviewData} user={user} />
+              </motion.div>
             ))}
           </div>
         </section>
@@ -485,7 +486,7 @@ export default function TopicDetail() {
             questions={quizModal.questions}
             topicTitle={topic.title}
             onFinish={finishQuiz}
-            onSkip={finishQuiz}
+            onGoBack={() => setQuizModal(null)}
           />
         )}
       </AnimatePresence>
@@ -621,7 +622,7 @@ function LowRatingModal({ stars, onSubmit, onSkip }) {
   );
 }
 
-function QuizModal({ questions, topicTitle, onFinish, onSkip }) {
+function QuizModal({ questions, topicTitle, onFinish, onGoBack }) {
   const [step, setStep]       = useState(0);
   const [selected, setSelected] = useState(null);
   const [revealed, setRevealed] = useState(false);
@@ -687,13 +688,13 @@ function QuizModal({ questions, topicTitle, onFinish, onSkip }) {
             You got <strong>{wrongs} question{wrongs !== 1 ? "s" : ""} wrong</strong> (3 or more means a retry).
           </p>
           <p style={{ color: "#6b7280", fontSize: "0.9rem", marginBottom: 16 }}>
-            Review the topic and try again — you can do it! 💪
+            Review the topic materials and try again — you can do it! 💪
           </p>
           <div className="modal-actions">
             <button className="btn btn-primary" onClick={handleRetry}>
               Try Again
             </button>
-            <button className="btn" onClick={onSkip} style={{ fontSize: 13 }}>Skip &amp; Complete anyway</button>
+            <button className="btn" onClick={onGoBack} style={{ fontSize: 13 }}>Go Back</button>
           </div>
         </motion.div>
       </motion.div>
@@ -795,7 +796,7 @@ function QuizModal({ questions, topicTitle, onFinish, onSkip }) {
               {isLast ? "See Results" : "Next →"}
             </button>
           )}
-          <button className="btn" onClick={onSkip} style={{ fontSize: 13 }}>Skip quiz</button>
+          <button className="btn" onClick={onGoBack} style={{ fontSize: 13 }}>Go Back</button>
         </div>
       </motion.div>
     </motion.div>
