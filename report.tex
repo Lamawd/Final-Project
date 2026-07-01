@@ -80,7 +80,7 @@
 
 \noindent\rule{\textwidth}{0.8pt}\\[1.2cm]
 
-{\fontsize{22}{28}\selectfont \textbf{Opic: A Topic-Structured Learning Platform\\[0.4cm]
+{\fontsize{22}{28}\selectfont \textbf{A Topic-Structured Learning Platform\\[0.4cm]
 with User-Driven Content Personalisation}}\\[1.2cm]
 
 \noindent\rule{\textwidth}{0.8pt}\\[2.0cm]
@@ -89,7 +89,7 @@ with User-Driven Content Personalisation}}\\[1.2cm]
 \begin{tabular}{r@{\quad}l}
 \textit{Student:}             & \textbf{Vũ Tùng Lâm} \\[0.5cm]
 \textit{Student ID:}          & \textbf{22BI13241} \\[0.5cm]
-\textit{External Supervisor:} & \textbf{Trương Trọng Tuấn} \\[0.5cm]
+\textit{External Supervisor:} & \textbf{Trương Trọng Tuấn} \\[0.25cm]
 \textit{Internal Supervisor:} & \textbf{Nguyễn Thị Hà Trang} \\
 \end{tabular}
 \end{center}
@@ -109,7 +109,7 @@ with User-Driven Content Personalisation}}\\[1.2cm]
 
 \vspace{1cm}
 
-\noindent I, \textbf{Trương Trọng Tuấn}, certify that the thesis of Mr \textbf{Vũ Tùng Lâm} is qualified to be presented in the Internship Jury 2025--2026.
+\noindent I, \textbf{Trương Trọng Tuấn}, certify that the thesis of Mr \textbf{Vũ Tùng Lâm} is qualified to be presented in the Internship Jury 2026--2027.
 
 \vspace{5cm}
 
@@ -184,7 +184,6 @@ The platform was deployed to free-tier cloud infrastructure (Render for the back
 \endhead
 API   & Application Programming Interface \\
 BCrypt & Blowfish Crypt -- password hashing algorithm \\
-BIT   & Business Information Technology \\
 CDN   & Content Delivery Network \\
 CF    & Collaborative Filtering \\
 CI/CD & Continuous Integration / Continuous Delivery \\
@@ -270,7 +269,7 @@ At the start of the project, the following features were identified as essential
   \item \textbf{Admin review workflow} -- drove the dedicated admin review page and the \texttt{POST /resources/\{id\}/review} endpoint with role checking.
   \item \textbf{Star ratings and engagement tracking} -- drove the \texttt{ratings} and \texttt{engagements} tables and the engagement-score formula used in the recommender. Combining explicit ratings with implicit signals such as time spent and completion rate is a standard technique for improving recommender accuracy \cite{hu2008}.
   \item \textbf{Personalised recommendations using collaborative filtering} -- drove the design of the recommender service, including the user-resource matrix, cosine similarity computation \cite{salton1988}, and Bayesian average popularity score to handle the cold-resource problem \cite{imdb_bayes}.
-  \item \textbf{Cold-start onboarding quiz} -- drove the \texttt{onboarding\_questions} and \texttt{onboarding\_answers} tables and the topic-boosting logic in the cold-start fallback. The cold-start problem is one of the most studied open challenges in recommender systems research \cite{schein2002, lam2008}.
+  \item \textbf{Cold-start onboarding quiz} -- drove the \texttt{onboarding\_questions} and \texttt{onboarding\_answers} tables and the topic-boosting logic in the cold-start fallback. The cold-start problem is one of the most studied open challenges in recommender systems research \cite{schein2002,lam2008}.
   \item \textbf{Progress tracking per topic} -- drove the \texttt{user\_progress} table and the progress page with the 30-day activity heatmap. Visual progress indicators have been shown to increase learner motivation and persistence \cite{hattie2007}.
   \item \textbf{Admin dashboard for user and content management} -- drove the admin user management page and the safeguard that prevents deletion of admin accounts.
 \end{itemize}
@@ -1492,6 +1491,12 @@ Given more time, the following improvements would be the most impactful:
 \addcontentsline{toc}{chapter}{References}
 
 \begin{thebibliography}{99}
+
+\bibitem{coursera2023}
+Coursera. (2023).
+\textit{Global Skills Report 2023}.
+Coursera Inc.
+Retrieved from \url{https://www.coursera.org/skills-reports/global}
 
 \bibitem{resnick1994}
 Resnick, P., Iacovou, N., Suchak, M., Bergstrom, P., \& Riedl, J. (1994).
