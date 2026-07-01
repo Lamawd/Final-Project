@@ -99,7 +99,7 @@ def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: Ses
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No account found with that email")
     if not verify_password(form.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect password")
-    token = create_access_token({"sub": str(user.id), "is_admin": user.is_admin})
+    token = create_access_token({"sub": str(user.id)})
     return {"access_token": token}
 
 
