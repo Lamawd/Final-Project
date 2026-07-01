@@ -28,12 +28,31 @@ frontend/.env
 frontend/.env.local
 frontend/.env.production
 
-# IDE
+# IDE / editor
 .vscode/
 .idea/
 *.swp
 *.swo
+.kiro/
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Report and thesis assets (not part of source code submission)
+report.tex
+report*.pdf
+main.pdf
+*.png
+*.pdf
+Comvis.pdf
+
+# Render/Vercel deployment noise (accidentally created files)
+26.1.2
+Build
+Deploying...
+Exited
+Running
+Setting
+Uploaded
+Uploading
