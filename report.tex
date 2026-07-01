@@ -137,11 +137,11 @@ I would like to thank my supervisors for their guidance and feedback throughout 
 
 Finding good learning material online is easy. Knowing what to study first, what order makes sense, and which of the thousands of results are actually useful -- that is the harder problem. Opic was built to address this for university students, particularly in ICT, Data Science, and BIT programmes.
 
-The platform organises content into topic roadmaps with prerequisite links, lets users submit and rate resources, and uses a recommendation engine to suggest relevant materials based on each user's behaviour. Technically, it is a React frontend talking to a FastAPI backend over a REST API, with a PostgreSQL database. The recommender uses user-based collaborative filtering (UBCF) with cosine similarity and a Bayesian average to handle sparse ratings. For new users with no history, an onboarding quiz seeds the cold-start fallback. When marking a topic complete, users take a short Gemini-generated quiz; getting three or more wrong sends them back to review first.
+The platform organises content into topic roadmaps with prerequisite links, lets users submit and rate resources, and ranks materials by relevance to each user based on their ratings and engagement history. Technically, it is a React frontend talking to a FastAPI backend over a REST API, with a PostgreSQL database. The ranking uses a basic user-based collaborative filtering approach with cosine similarity and a Bayesian average to handle sparse ratings. For new users with no history, an onboarding quiz seeds the cold-start fallback. When marking a topic complete, users take a short Gemini-generated quiz; getting three or more wrong sends them back to review first.
 
 The system is deployed on Render (backend) and Vercel (frontend) and was tested end-to-end with multiple accounts. All fifteen functional requirements are working on the live deployment.
 
-\textbf{Keywords:} recommender systems, collaborative filtering, learning platform, FastAPI, React, cold-start, Bayesian average, knowledge quiz
+\textbf{Keywords:} personalised ranking, collaborative filtering, learning platform, FastAPI, React, cold-start, Bayesian average, knowledge quiz
 
 \newpage
 
@@ -222,9 +222,9 @@ There is no shortage of learning material online. YouTube, Coursera, and Medium 
 
 This problem has been studied in the e-learning literature. Drachsler and Greller \cite{drachsler2016} call it the ``paradox of choice'': more resources does not mean better learning, and too many options can increase cognitive load and leave learners more confused than when they started. Burke \cite{burke2002} made a similar point -- web-based learning environments have long struggled to show people content that is relevant to them specifically, rather than just popular in general.
 
-Recommender systems have been one answer to this since the mid-1990s, starting with the GroupLens project \cite{resnick1994}, which applied collaborative filtering to Usenet articles. Collaborative filtering has since become the standard approach for personalised recommendation \cite{koren2009} and is used by Netflix, Spotify, and Amazon at scale. Its use in education, however, is less developed -- most academic platforms still depend on manually curated course structures \cite{tang2015}.
+Recommender systems have been studied since the mid-1990s, starting with the GroupLens project \cite{resnick1994}, which applied collaborative filtering to Usenet articles. Collaborative filtering has since become a standard approach for personalised ranking \cite{koren2009}, used at scale by platforms like Netflix and Spotify. Opic applies a simplified version of these ideas -- not at the scale or sophistication of those systems, but enough to rank resources differently for different users based on their rating behaviour.
 
-Opic was built to address this gap. The name comes from \textit{topic}, the core unit of learning in the system. It is a web-based platform that organises content into structured topic roadmaps, lets users submit and rate resources, and uses a recommendation engine to surface materials relevant to each person based on how they interact with the platform.
+Opic was built to address this gap. The name comes from \textit{topic}, the core unit of learning in the system. It is a web-based platform that organises content into structured topic roadmaps, lets users submit and rate resources, and ranks materials by relevance to each person based on their ratings and engagement history.
 
 The target audience is university students, particularly in ICT, Data Science, and BIT programmes at USTH, where students are expected to do a lot of self-directed study and the volume of available material can be hard to navigate \cite{zimmerman2002,brusilovsky2007}.
 
@@ -238,7 +238,7 @@ This project set out to build a working, deployable learning platform that tackl
   \item \textbf{Personalisation} -- getting the same results as everyone else regardless of background.
 \end{enumerate}
 
-These are addressed through topic roadmaps with prerequisite links, a community submission and admin review pipeline, and a user-based collaborative filtering engine. UBCF was chosen over content-based filtering (which needs expert tagging) and matrix factorisation (which requires offline training) because it is simpler, interpretable, and works on live data \cite{herlocker2004}. The cold-start problem for new users with no history is handled through an onboarding quiz \cite{schein2002}.
+These are addressed through topic roadmaps with prerequisite links, a community submission and admin review pipeline, and a basic user-based collaborative filtering approach for ranking resources. The CF approach was chosen over content-based filtering (which needs expert tagging) and matrix factorisation (which requires offline training) because it is simpler, interpretable, and works directly on live rating data \cite{herlocker2004}. The cold-start problem for new users with no rating history is partially mitigated through an onboarding quiz \cite{schein2002}.
 
 \section{Expected Outcome}
 
@@ -246,7 +246,7 @@ By the end of the project, the following were working and deployed:
 
 \begin{itemize}
   \item A live web application where users can register, take the onboarding quiz, browse topic roadmaps, and access curated resources.
-  \item A recommendation engine that gives useful suggestions from day one (via the onboarding quiz cold-start) and gets better as users rate and complete resources.
+  \item A personalised ranking feature that suggests resources from day one (via the onboarding quiz cold-start) and produces different results for different users as they rate and complete resources.
   \item An admin content pipeline: users submit resources, admins approve or reject them, and only approved resources appear on topic pages.
   \item Topic-level progress tracking with a 30-day activity heatmap.
   \item JWT authentication with a password reset flow \cite{ietfjwt}. Passwords are stored as bcrypt hashes per OWASP guidelines \cite{owasp}.
@@ -263,7 +263,7 @@ The features listed below were agreed on at the start of the project. Each one d
   \item \textbf{Topic roadmaps with prerequisites} -- topics are ordered and linked, so the system can tell a user what they should do first \cite{brusilovsky2007}.
   \item \textbf{Community resource submission} -- any logged-in user can submit a link; admins review it before it goes live. Crowdsourced curation works well at scale \cite{anderson2012}.
   \item \textbf{Admin review} -- a dedicated page for approving or rejecting pending submissions.
-  \item \textbf{Star ratings and engagement tracking} -- explicit ratings combined with implicit signals (time spent, completion, revisits) feed into the recommender score \cite{hu2008}.
+  \item \textbf{Star ratings and engagement tracking} -- explicit ratings combined with implicit signals (time spent, completion, revisits) feed into the ranking score \cite{hu2008}.
   \item \textbf{Collaborative filtering} -- user-resource matrix with cosine similarity \cite{salton1988} and a Bayesian average to handle resources with few ratings \cite{imdb_bayes}.
   \item \textbf{Onboarding quiz cold-start} -- new users answer a few questions that are mapped to topics; matching resources get a score boost until the user builds up a rating history \cite{schein2002,lam2008}.
   \item \textbf{Progress tracking} -- mark topics done, view a 30-day heatmap. Visual progress feedback helps with motivation \cite{hattie2007}.
@@ -305,7 +305,7 @@ FR-06 & Resource Submission & Logged-in users can submit a resource URL for admi
 FR-07 & Resource Rating & Users can rate a resource 1--5 stars with optional feedback. \\
 FR-08 & Engagement Tracking & The system records watch completion, time spent, revisits, and completion. \\
 FR-09 & Topic Progress & Users can mark topics as completed and track overall progress. \\
-FR-10 & Onboarding Quiz & New users answer questions to seed the recommendation engine. \\
+FR-10 & Onboarding Quiz & New users answer questions to seed the cold-start ranking fallback. \\
 FR-11 & Recommendations & The system recommends resources personalised to each user. \\
 FR-12 & Admin Review & Admins can approve or reject pending resource submissions. \\
 FR-13 & Admin User Management & Admins can view and delete user accounts. \\
@@ -523,7 +523,7 @@ Table~\ref{tab:timeline} shows what was done each phase.
 April (Weeks 1--2) & Project setup, database schema, auth (register, login, JWT) \\
 April (Weeks 3--4) & Topics, courses, prerequisite links, seed data \\
 May (Weeks 1--2) & Resource upload, admin review, ratings \\
-May (Weeks 3--4) & Engagement tracking, recommendation engine \\
+May (Weeks 3--4) & Engagement tracking, personalised ranking feature \\
 June (Weeks 1--2) & Onboarding quiz, cold-start, progress tracking, home feed \\
 June (Weeks 3--4) & UI, bug fixes, deployment, report \\
 \bottomrule
@@ -540,7 +540,7 @@ Git was used throughout, with commits organised by feature. The repository is on
 Testing was done at two levels:
 
 \begin{enumerate}
-  \item \textbf{Automated tests} using \texttt{pytest} and the FastAPI test client. These cover the auth flows and the recommender algorithm (scoring formula and cold-start fallback).
+  \item \textbf{Automated tests} using \texttt{pytest} and the FastAPI test client. These cover the auth flows and the ranking algorithm (scoring formula and cold-start fallback).
   \item \textbf{Manual end-to-end testing} on the deployed site, done by several classmates across different devices and browsers. This caught two bugs -- a CORS ordering issue and a missing route -- that are documented in Chapter 9.
 \end{enumerate}
 
@@ -575,7 +575,7 @@ The backend uses FastAPI. It is split into four layers:
 \begin{itemize}
   \item \texttt{app/api/} -- route handlers (\texttt{auth}, \texttt{topics}, \texttt{resources}, \texttt{recommend})
   \item \texttt{app/models/} -- SQLAlchemy ORM models
-  \item \texttt{app/services/} -- business logic (recommender)
+  \item \texttt{app/services/} -- business logic (personalised ranking)
   \item \texttt{app/core/} -- database setup, JWT, password hashing
 \end{itemize}
 
@@ -716,7 +716,7 @@ created\_at & DATETIME & Submission timestamp \\
 
 \subsection{ratings}
 
-The \texttt{ratings} table records each user's explicit feedback on a resource. It feeds directly into the recommendation engine's user-resource matrix.
+The \texttt{ratings} table records each user's explicit feedback on a resource. It feeds directly into the user-resource matrix used for personalised ranking.
 
 \begin{longtable}{p{0.22\textwidth} p{0.18\textwidth} p{0.5\textwidth}}
 \caption{Table: ratings}\label{tab:ratings}\\
@@ -739,7 +739,7 @@ The composite primary key \texttt{(user\_id, resource\_id)} enforces one rating 
 
 \subsection{engagements}
 
-The \texttt{engagements} table captures implicit feedback signals that supplement the explicit star ratings. These signals are combined with the star rating to produce the weighted engagement score used in the recommendation engine (see Chapter 6).
+The \texttt{engagements} table captures implicit feedback signals that supplement the explicit star ratings. These signals are combined with the star rating to produce the weighted engagement score used for ranking (see Chapter 6).
 
 \begin{longtable}{p{0.22\textwidth} p{0.18\textwidth} p{0.5\textwidth}}
 \caption{Table: engagements}\label{tab:engagements}\\
@@ -956,7 +956,7 @@ Figure~\ref{fig:seq-progress} shows how a user marks a topic as completed. The p
 \section{Recommendation Engine}
 \label{sec:impl-rec}
 
-The recommendation engine is the core academic contribution of this project. It combines two complementary approaches to handle both active users and cold-start users.
+The personalised ranking feature applies a basic collaborative filtering approach to order resources by predicted relevance for each user. It handles two cases: users who have rated resources, and new users with no history.
 
 \subsection{Recommendation Sequence}
 
@@ -969,7 +969,7 @@ Figure~\ref{fig:seq-rec} shows how recommendations are generated when a user ope
 \label{fig:seq-rec}
 \end{figure}
 
-\subsection{User-Based Collaborative Filtering (UBCF)}
+\subsection{User-Based Collaborative Filtering Approach}
 
 For users who have rated at least one resource, the system builds a user-resource matrix where each cell represents a weighted engagement score. Figure~\ref{fig:ubcf-matrix} illustrates how the matrix is used to predict a missing score for the target user.
 
@@ -1024,7 +1024,7 @@ For users who have rated at least one resource, the system builds a user-resourc
 \node[cell, right=0cm of rD-|h5] {0.00};
 
 \end{tikzpicture}
-\caption{UBCF User-Resource Matrix. User C (target, ★) shares high scores on Resource 1 and 4 with User B (blue). The system predicts User C's score for Resource 5 using User B's engagement, then recommends it.}
+\caption{User-Resource Matrix. User C shares high scores on Resource 1 and 4 with User B. The system estimates User C's score for Resource 5 based on User B's engagement.}
 \label{fig:ubcf-matrix}
 \end{figure}
 
@@ -1154,7 +1154,7 @@ The admin user management page (UC-09) lists all registered accounts. Admins can
 
 \section{Summary}
 
-This chapter has shown how each of the eleven use cases is realised through a combination of frontend pages, REST API endpoints, and database operations. The most technically complex components are the recommendation engine and the AI knowledge quiz. The recommendation engine requires non-trivial matrix computation; the quiz integrates an external generative AI API with a robust fallback strategy. The next chapter lists the complete set of tools and libraries that were used to build the system.
+This chapter has shown how each use case is realised through frontend pages, REST API endpoints, and database operations. The most technically involved parts are the personalised ranking feature and the AI knowledge quiz. The ranking requires building a user-resource matrix and computing cosine similarity; the quiz integrates an external generative AI API with a local fallback. The next chapter lists the tools used.
 
 % ============================================================
 % CHAPTER 7 -- TOOLS AND TECHNIQUES
@@ -1275,7 +1275,7 @@ Figure~\ref{fig:ui-quiz} shows the AI-generated knowledge quiz modal that appear
 
 \subsection{Suggested Resources}
 
-Figure~\ref{fig:ui-suggested} shows the personalised resource suggestions section on the topic detail page. Resources are ranked by the recommendation engine score and displayed below the topic's own resource list.
+Figure~\ref{fig:ui-suggested} shows the personalised resource suggestions section on the topic detail page. Resources are ranked by their computed score and displayed below the topic's own resource list.
 
 \begin{figure}[H]
 \centering
@@ -1376,7 +1376,7 @@ Figure~\ref{fig:ui-onboarding} shows the onboarding quiz screen that appears imm
 
 \subsection{Recommendation Quality}
 
-To verify the recommendation engine, two test accounts were created with deliberately different interaction histories. Each account rated five resources in different topic areas. After these interactions, the two accounts received noticeably different sets of recommendations, confirming that the collaborative filtering component correctly differentiates users based on their behaviour.
+To verify the ranking feature, two test accounts were created with deliberately different rating histories. Each account rated five resources in different topic areas. After these interactions, the two accounts received noticeably different sets of suggestions, confirming that the collaborative filtering logic differentiates users based on their behaviour.
 
 For a brand-new account with no ratings, the system correctly fell back to popularity-based ranking boosted by onboarding quiz answers, confirming that the cold-start handling works as designed.
 
@@ -1439,7 +1439,7 @@ Both bugs were caught through manual end-to-end testing on the live deployment, 
 
 Opic started as a response to a straightforward problem: as a student studying ICT, it is genuinely hard to figure out what to learn next and whether a given tutorial is worth your time. The platform was built and deployed within the planned three months and ended up meeting all fifteen functional requirements.
 
-The part I found most interesting to build was the recommendation engine. Getting something useful out of a sparse rating matrix -- and doing it in a way that still works for brand-new users with no history -- required combining collaborative filtering with a Bayesian popularity score and an onboarding quiz cold-start. The result is not perfect, but it does produce noticeably different recommendations for different users, which was the goal.
+The part I found most interesting to build was the ranking feature. Getting anything useful out of a sparse rating matrix -- and having it still work for brand-new users with no history -- required combining a basic collaborative filtering approach with a Bayesian popularity score and an onboarding quiz fallback. It is a simple implementation, not a production-grade system, but it does produce noticeably different suggestions for different users, which was the goal.
 
 The architectural choice to keep the frontend and backend completely separate also paid off. Being able to push changes to the Vercel frontend without touching the Render backend (and vice versa) made the last few weeks of bug fixing much more manageable.
 
