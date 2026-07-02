@@ -262,34 +262,91 @@ async def get_course_quiz(course_id: int, db: Session = Depends(get_db),
         except Exception:
             pass  # fall through to fallback
 
-    # Fallback: 10 generic MCQ from topic titles
-    fallback_questions = []
-    for i, t in enumerate(topics[:10]):
-        fallback_questions.append({
+    # Fallback: real hardcoded questions per course
+    FALLBACK_QUESTIONS = {
+        1: [  # DSA
+            {"type":"mcq","q":"What is the time complexity of binary search on a sorted array of n elements?","options":["O(n)","O(log n)","O(n log n)","O(1)"],"answer":1},
+            {"type":"mcq","q":"Which data structure uses LIFO (Last In, First Out) ordering?","options":["Queue","Linked List","Stack","Binary Tree"],"answer":2},
+            {"type":"mcq","q":"What is the worst-case time complexity of QuickSort?","options":["O(n log n)","O(n)","O(n²)","O(log n)"],"answer":2},
+            {"type":"mcq","q":"In a singly linked list, what is the time complexity of inserting at the head?","options":["O(n)","O(log n)","O(n²)","O(1)"],"answer":3},
+            {"type":"mcq","q":"Which traversal of a BST visits nodes in ascending sorted order?","options":["Pre-order","Post-order","In-order","Level-order"],"answer":2},
+            {"type":"mcq","q":"Dijkstra's algorithm finds the shortest path assuming all edge weights are:","options":["Negative","Zero","Non-negative","Integers only"],"answer":2},
+            {"type":"mcq","q":"What data structure is most efficient for implementing a priority queue?","options":["Array","Heap","Doubly linked list","Stack"],"answer":1},
+            {"type":"mcq","q":"What is the space complexity of merge sort?","options":["O(1)","O(log n)","O(n)","O(n²)"],"answer":2},
+            {"type":"mcq","q":"Which graph traversal algorithm uses a queue?","options":["DFS","BFS","Dijkstra","Bellman-Ford"],"answer":1},
+            {"type":"mcq","q":"An algorithm with O(2ⁿ) complexity is described as:","options":["Linear","Polynomial","Logarithmic","Exponential"],"answer":3},
+        ],
+        2: [  # Python
+            {"type":"mcq","q":"What is the output of `[x**2 for x in range(4)]`?","options":["[1,4,9,16]","[0,1,4,9]","[0,2,4,6]","[1,2,3,4]"],"answer":1},
+            {"type":"mcq","q":"Which keyword is used to create a generator function in Python?","options":["return","async","yield","lambda"],"answer":2},
+            {"type":"mcq","q":"What does `dict.get('key', 'default')` return when 'key' is absent?","options":["None","KeyError","'default'","False"],"answer":2},
+            {"type":"mcq","q":"What is the difference between `is` and `==` in Python?","options":["They are identical","'is' checks value equality, '==' checks identity","'is' checks identity, '==' checks value equality","'is' is used for numbers only"],"answer":2},
+            {"type":"mcq","q":"Which of the following is an immutable data type in Python?","options":["list","dict","set","tuple"],"answer":3},
+            {"type":"mcq","q":"What does the `__init__` method do in a Python class?","options":["Destroys the object","Initialises object attributes when an instance is created","Returns the string representation","Copies the object"],"answer":1},
+            {"type":"mcq","q":"What does `try/except/finally` guarantee about the `finally` block?","options":["It only runs if no exception occurs","It only runs if an exception occurs","It always runs regardless of exceptions","It runs before the try block"],"answer":2},
+            {"type":"mcq","q":"What is the result of `'hello'[::-1]`?","options":["'hello'","'olleh'","'h'","Error"],"answer":1},
+            {"type":"mcq","q":"Which built-in function returns an iterator of (index, value) pairs?","options":["zip()","map()","enumerate()","filter()"],"answer":2},
+            {"type":"mcq","q":"What is the purpose of `if __name__ == '__main__':` in a Python script?","options":["It defines the main class","It runs only when the file is executed directly, not imported","It imports the main module","It prevents the script from running"],"answer":1},
+        ],
+        3: [  # Web
+            {"type":"mcq","q":"What does the CSS `box-sizing: border-box` property do?","options":["Adds a border around all elements","Makes padding and border included in the element's total width/height","Removes all padding","Sets the border radius"],"answer":1},
+            {"type":"mcq","q":"Which HTTP method is idempotent and should be used to fully replace a resource?","options":["POST","PATCH","PUT","DELETE"],"answer":2},
+            {"type":"mcq","q":"In React, what triggers a component to re-render?","options":["A change in a local variable","A change in state or props","Calling a function inside the component","Importing a new module"],"answer":1},
+            {"type":"mcq","q":"What is the purpose of the `useEffect` hook with an empty dependency array `[]`?","options":["Runs on every render","Runs only once after the initial render","Runs only when state changes","Runs before the component mounts"],"answer":1},
+            {"type":"mcq","q":"What does a 401 HTTP status code mean?","options":["Resource not found","Server error","Unauthorised — authentication required","Forbidden — no permission"],"answer":2},
+            {"type":"mcq","q":"What is the difference between `localStorage` and `sessionStorage`?","options":["localStorage is faster","sessionStorage persists after the browser closes, localStorage does not","localStorage persists after the browser closes, sessionStorage does not","They are identical"],"answer":2},
+            {"type":"mcq","q":"Which CSS property is used to create a flexible container?","options":["display: block","display: grid","display: flex","position: relative"],"answer":2},
+            {"type":"mcq","q":"In a REST API, what should a successful POST request that creates a resource return?","options":["200 OK","204 No Content","201 Created","301 Redirect"],"answer":2},
+            {"type":"mcq","q":"What does `event.preventDefault()` do in JavaScript?","options":["Stops event propagation to parent elements","Removes the event listener","Prevents the browser's default action for the event","Deletes the element"],"answer":2},
+            {"type":"mcq","q":"What is the main advantage of a CDN for a frontend deployment?","options":["It compiles JavaScript faster","It serves static assets from servers geographically close to users","It encrypts all API calls","It replaces the need for a backend"],"answer":1},
+        ],
+        4: [  # Databases
+            {"type":"mcq","q":"What does the ACID property 'Isolation' guarantee?","options":["Data is never lost","Concurrent transactions do not interfere with each other","All changes are permanent after commit","The database starts in a valid state"],"answer":1},
+            {"type":"mcq","q":"Which SQL clause filters rows after aggregation?","options":["WHERE","HAVING","GROUP BY","ORDER BY"],"answer":1},
+            {"type":"mcq","q":"What is a foreign key?","options":["A key that uniquely identifies a row","A key that references the primary key of another table","A key used for encryption","An index on a non-primary column"],"answer":1},
+            {"type":"mcq","q":"What normal form eliminates transitive dependencies?","options":["1NF","2NF","3NF","BCNF"],"answer":2},
+            {"type":"mcq","q":"Which JOIN returns all rows from the left table even if there is no match in the right?","options":["INNER JOIN","RIGHT JOIN","LEFT JOIN","FULL JOIN"],"answer":2},
+            {"type":"mcq","q":"In NoSQL document stores, data is typically stored as:","options":["Tables with rows","JSON-like documents","Binary blobs","Key-integer pairs only"],"answer":1},
+            {"type":"mcq","q":"What does a database index trade off to improve read performance?","options":["Consistency","Write speed and storage space","Isolation level","Referential integrity"],"answer":1},
+            {"type":"mcq","q":"Which isolation level prevents dirty reads but allows non-repeatable reads?","options":["Read Uncommitted","Read Committed","Repeatable Read","Serializable"],"answer":1},
+            {"type":"mcq","q":"What is the purpose of the `ON DELETE CASCADE` constraint?","options":["Prevents deletion of referenced rows","Automatically deletes child rows when the parent is deleted","Copies deleted rows to an archive","Sets foreign key columns to NULL on deletion"],"answer":1},
+            {"type":"mcq","q":"Which of the following is a key characteristic of the CAP theorem?","options":["A distributed system can guarantee consistency, availability, and partition tolerance simultaneously","A distributed system can guarantee at most two of the three: consistency, availability, partition tolerance","CAP applies only to relational databases","Partition tolerance is always optional"],"answer":1},
+        ],
+        5: [  # ML
+            {"type":"mcq","q":"What is overfitting in a machine learning model?","options":["The model performs poorly on both training and test data","The model learns the training data too well including noise, and generalises poorly","The model is too simple to capture patterns","The model trains too slowly"],"answer":1},
+            {"type":"mcq","q":"What does the bias-variance tradeoff describe?","options":["The balance between model accuracy and training speed","The tension between a model being too simple (high bias) and too flexible (high variance)","The tradeoff between labelled and unlabelled data","The balance between precision and recall"],"answer":1},
+            {"type":"mcq","q":"Which metric is most appropriate when false negatives are more costly than false positives?","options":["Accuracy","Precision","Recall","F1 Score"],"answer":2},
+            {"type":"mcq","q":"What does k-fold cross-validation do?","options":["Trains k separate models on different datasets","Splits data into k folds, trains k times each time using a different fold as validation","Runs the model k times with random seeds","Selects the top k features"],"answer":1},
+            {"type":"mcq","q":"What is the role of the activation function in a neural network?","options":["It initialises the weights","It introduces non-linearity so the network can learn complex patterns","It calculates the loss","It normalises the input data"],"answer":1},
+            {"type":"mcq","q":"In gradient descent, what does the learning rate control?","options":["The number of training epochs","The size of each step taken toward the minimum of the loss function","The number of hidden layers","The amount of regularisation"],"answer":1},
+            {"type":"mcq","q":"What is the main difference between supervised and unsupervised learning?","options":["Supervised learning uses more data","Supervised learning trains on labelled data; unsupervised learning finds patterns without labels","Unsupervised learning is always more accurate","Supervised learning does not use a loss function"],"answer":1},
+            {"type":"mcq","q":"What does PCA (Principal Component Analysis) primarily do?","options":["Classifies data into clusters","Reduces dimensionality by projecting data onto axes of maximum variance","Increases the number of features","Removes outliers from the dataset"],"answer":1},
+            {"type":"mcq","q":"Which regularisation technique randomly drops neurons during training?","options":["L1 regularisation","L2 regularisation","Dropout","Batch normalisation"],"answer":2},
+            {"type":"mcq","q":"What is a confusion matrix used for?","options":["Visualising neural network layers","Summarising the performance of a classification model by showing TP, TN, FP, FN counts","Plotting the loss curve","Comparing two regression models"],"answer":1},
+        ],
+    }
+
+    fallback = FALLBACK_QUESTIONS.get(course_id, [])
+    if fallback:
+        return {"questions": fallback, "has_coding": False}
+
+    # Last resort generic fallback if course_id not in map
+    generic = []
+    for t in topics[:10]:
+        generic.append({
             "type": "mcq",
-            "q": f"What is the primary concept covered in '{t.title.split(': ')[-1]}'?",
+            "q": f"Which statement best describes '{t.title.split(': ')[-1]}'?",
             "options": [
-                f"The core principles of {t.title.split(': ')[-1]}",
-                f"Only hardware-level implementation details",
-                f"An unrelated frontend styling technique",
-                f"A deprecated legacy method",
+                f"A foundational concept with well-documented applications",
+                f"Applicable only to legacy systems",
+                f"Rarely used in modern development",
+                f"Only relevant at hardware level",
             ],
             "answer": 0,
         })
-    # Pad to 10 if fewer topics
-    while len(fallback_questions) < 10:
-        fallback_questions.append({
-            "type": "mcq",
-            "q": f"Which of the following best describes a key learning outcome of this course?",
-            "options": [
-                "Building practical skills applicable to real projects",
-                "Memorising syntax with no practical use",
-                "Avoiding all modern best practices",
-                "Using only outdated tools",
-            ],
-            "answer": 0,
-        })
-    return {"questions": fallback_questions[:10], "has_coding": False}
+    while len(generic) < 10:
+        generic.append({"type":"mcq","q":"Which practice leads to more maintainable code?","options":["Writing long functions","Using meaningful names and keeping functions small","Avoiding comments","Hardcoding all values"],"answer":1})
+    return {"questions": generic[:10], "has_coding": False}
 
 
 class CodeCheckRequest(BaseModel):
