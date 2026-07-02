@@ -9,6 +9,10 @@ import httpx, os, json
 
 router = APIRouter(prefix="/topics", tags=["topics"])
 
+# In-memory quiz cache — keyed by "topic:{id}" or "course:{id}"
+# Survives for the lifetime of the server process, preventing redundant Gemini calls
+_quiz_cache: dict = {}
+
 
 class TopicCreate(BaseModel):
     title: str
@@ -75,6 +79,10 @@ async def get_quiz(topic_id: int, db: Session = Depends(get_db),
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
 
+    cache_key = f"topic:{topic_id}"
+    if cache_key in _quiz_cache:
+        return _quiz_cache[cache_key]
+
     gemini_key = os.environ.get("GEMINI_API_KEY", "")
 
     prompt = (
@@ -105,6 +113,7 @@ async def get_quiz(topic_id: int, db: Session = Depends(get_db),
                 raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
             data = json.loads(raw)
             if "questions" in data and len(data["questions"]) > 0:
+                _quiz_cache[cache_key] = data
                 return data
         except Exception:
             pass  # fall through to local generation
@@ -173,6 +182,10 @@ async def get_course_quiz(course_id: int, db: Session = Depends(get_db),
     Generate a comprehensive course-completion quiz (10 questions).
     For code-heavy courses (DSA, Python, Web) some questions are coding challenges.
     """
+    cache_key = f"course:{course_id}"
+    if cache_key in _quiz_cache:
+        return _quiz_cache[cache_key]
+
     # Courses with coding challenges: 1=DSA, 2=Python, 3=Web
     CODING_COURSE_IDS = {1, 2, 3}
     is_coding_course = course_id in CODING_COURSE_IDS
@@ -258,7 +271,9 @@ async def get_course_quiz(course_id: int, db: Session = Depends(get_db),
                 raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
             data = json.loads(raw)
             if "questions" in data and len(data["questions"]) >= 5:
-                return {"questions": data["questions"], "has_coding": is_coding_course}
+                result = {"questions": data["questions"], "has_coding": is_coding_course}
+                _quiz_cache[cache_key] = result
+                return result
         except Exception:
             pass  # fall through to fallback
 
