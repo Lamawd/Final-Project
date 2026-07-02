@@ -51,6 +51,9 @@ app.include_router(recommendations.router)
 
 @app.on_event("startup")
 def startup():
+    db_url = os.getenv("DATABASE_URL", "sqlite:///./opic.db")
+    db_type = "PostgreSQL" if db_url.startswith("postgresql") else "SQLite (ephemeral — data will NOT persist on Render!)"
+    logger.info(f"Database: {db_type}")
     init_db()
     # Safe column/table migrations for existing databases
     from app.core.database import engine
