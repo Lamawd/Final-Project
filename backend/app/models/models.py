@@ -180,3 +180,22 @@ class CourseRequest(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User")
+
+
+class QuizCache(Base):
+    """
+    Persistent per-user quiz cache.
+    Avoids regenerating quizzes on every server restart and ensures
+    each user gets a personalised quiz generated exactly once per topic/course.
+    """
+    __tablename__ = "quiz_cache"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    # cache_key format: "topic:{topic_id}" or "course:{course_id}"
+    cache_key = Column(String, nullable=False)
+    json_data = Column(Text, nullable=False)   # serialised JSON quiz
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_quiz_cache_user_key", "user_id", "cache_key", unique=True),
+    )

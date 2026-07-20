@@ -4,14 +4,104 @@ from pydantic import BaseModel
 from typing import Optional
 from app.core.database import get_db
 from app.core.security import get_current_user, require_admin
-from app.models.models import Topic, TopicPrerequisite, UserProgress, User
+from app.models.models import (
+    Topic, TopicPrerequisite, UserProgress, User,
+    Rating, Engagement, Resource, QuizCache,
+)
 import httpx, os, json
 
 router = APIRouter(prefix="/topics", tags=["topics"])
 
-# In-memory quiz cache — keyed by "topic:{id}" or "course:{id}"
-# Survives for the lifetime of the server process, preventing redundant Gemini calls
-_quiz_cache: dict = {}
+GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+
+
+def _get_user_context(user_id: int, db: Session) -> dict:
+    """
+    Collect the user's learning history to personalise quiz generation.
+    Returns a dict with completed topics, struggled resources, and strong topics.
+    Capped at small sizes to keep prompt tokens low.
+    """
+    # Topics the user has completed
+    completed = (
+        db.query(UserProgress)
+        .filter_by(user_id=user_id, completed=True)
+        .join(UserProgress.topic)
+        .all()
+    )
+    completed_titles = [p.topic.title for p in completed if p.topic][:8]
+
+    # Resources rated poorly (1-2 stars) — likely weak areas
+    low_ratings = (
+        db.query(Rating)
+        .filter(Rating.user_id == user_id, Rating.stars <= 2)
+        .join(Rating.resource)
+        .all()
+    )
+    weak_resources = [r.resource.title for r in low_ratings if r.resource][:4]
+
+    # Resources with high engagement (revisited 2+ times) — strong interest areas
+    high_engagement = (
+        db.query(Engagement)
+        .filter(
+            Engagement.user_id == user_id,
+            Engagement.revisit_count >= 2,
+        )
+        .join(Engagement.resource)
+        .all()
+    )
+    strong_resources = [e.resource.title for e in high_engagement if e.resource][:4]
+
+    return {
+        "completed_titles": completed_titles,
+        "weak_resources": weak_resources,
+        "strong_resources": strong_resources,
+    }
+
+
+def _build_user_context_block(ctx: dict) -> str:
+    """Format user context into a compact string for injection into prompts."""
+    lines = []
+    if ctx["completed_titles"]:
+        lines.append(f"Topics already completed: {', '.join(ctx['completed_titles'])}.")
+    if ctx["strong_resources"]:
+        lines.append(f"Resources they revisited often (strong interest): {', '.join(ctx['strong_resources'])}.")
+    if ctx["weak_resources"]:
+        lines.append(f"Resources they rated poorly (potential weak areas): {', '.join(ctx['weak_resources'])}.")
+    return "\n".join(lines)
+
+
+async def _call_gemini(prompt: str, gemini_key: str, timeout: float = 25.0) -> Optional[dict]:
+    """Call Gemini API and return parsed JSON, or None on any failure."""
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(
+                f"{GEMINI_URL}?key={gemini_key}",
+                json={"contents": [{"parts": [{"text": prompt}]}]},
+            )
+        resp.raise_for_status()
+        raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+        return json.loads(raw)
+    except Exception:
+        return None
+
+
+def _load_db_cache(user_id: int, cache_key: str, db: Session) -> Optional[dict]:
+    entry = db.query(QuizCache).filter_by(user_id=user_id, cache_key=cache_key).first()
+    if entry:
+        return json.loads(entry.json_data)
+    return None
+
+
+def _save_db_cache(user_id: int, cache_key: str, data: dict, db: Session) -> None:
+    existing = db.query(QuizCache).filter_by(user_id=user_id, cache_key=cache_key).first()
+    if existing:
+        existing.json_data = json.dumps(data)
+    else:
+        db.add(QuizCache(user_id=user_id, cache_key=cache_key, json_data=json.dumps(data)))
+    db.commit()
 
 
 class TopicCreate(BaseModel):
@@ -75,122 +165,132 @@ def mark_progress(topic_id: int, completed: bool = True,
 @router.get("/{topic_id}/quiz")
 async def get_quiz(topic_id: int, db: Session = Depends(get_db),
                    current_user: User = Depends(get_current_user)):
+    """
+    Generate a personalised 5-question MCQ quiz for a topic.
+    Uses the user's learning history (completed topics, weak/strong areas)
+    to tailor question difficulty and focus.
+    Result is cached per user+topic in the DB — Gemini is only called once per user per topic.
+    """
     topic = db.query(Topic).filter(Topic.id == topic_id).first()
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
 
     cache_key = f"topic:{topic_id}"
-    if cache_key in _quiz_cache:
-        return _quiz_cache[cache_key]
+
+    # Check DB cache first — avoids re-calling Gemini on server restart
+    cached = _load_db_cache(current_user.id, cache_key, db)
+    if cached:
+        return cached
 
     gemini_key = os.environ.get("GEMINI_API_KEY", "")
 
-    prompt = (
-        f'Generate exactly 5 multiple choice questions to test knowledge of "{topic.title}".\n'
-        f'Topic description: {topic.description or "a programming/tech topic"}\n'
-        f'Rules:\n'
-        f'- Questions must test actual understanding of the topic concepts, not feelings\n'
-        f'- Each question must have exactly 4 options\n'
-        f'- Only one option is correct\n'
-        f'- "answer" is the 0-based index of the correct option\n'
-        f'- Make the wrong options plausible (not obviously wrong)\n'
-        f'- Vary the position of the correct answer (not always index 0)\n'
-        f'Return ONLY valid JSON, no markdown, no extra text.\n'
-        f'Format: {{"questions": [{{"q": "question text", "options": ["option0", "option1", "option2", "option3"], "answer": 2}}]}}'
-    )
-
     if gemini_key:
-        try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
-                    json={"contents": [{"parts": [{"text": prompt}]}]},
-                )
-            resp.raise_for_status()
-            raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-            raw = raw.strip()
-            if raw.startswith("```"):
-                raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-            data = json.loads(raw)
-            if "questions" in data and len(data["questions"]) > 0:
-                _quiz_cache[cache_key] = data
-                return data
-        except Exception:
-            pass  # fall through to local generation
+        ctx = _get_user_context(current_user.id, db)
+        user_block = _build_user_context_block(ctx)
 
-    # Local fallback: use topic title/description to form knowledge questions
+        personalisation = (
+            f"\nStudent learning profile:\n{user_block}\n"
+            f"Use this profile to:\n"
+            f"- Ask harder questions on topics they have already completed\n"
+            f"- Focus on concepts related to their weak areas if relevant\n"
+            f"- Skip overly basic definitions if they have strong engagement history\n"
+        ) if user_block else ""
+
+        prompt = (
+            f'Generate exactly 5 multiple choice questions to test knowledge of "{topic.title}".\n'
+            f'Topic description: {topic.description or "a programming/tech topic"}\n'
+            f'{personalisation}\n'
+            f'Rules:\n'
+            f'- Test actual understanding — NOT trivial definitions or feelings\n'
+            f'- Each question must have exactly 4 options\n'
+            f'- Only one option is correct\n'
+            f'- "answer" is the 0-based index of the correct option\n'
+            f'- Make the wrong options plausible (not obviously wrong)\n'
+            f'- Vary the position of the correct answer\n'
+            f'Return ONLY valid JSON, no markdown, no extra text.\n'
+            f'Format: {{"questions": [{{"q": "...", "options": ["o0","o1","o2","o3"], "answer": 2}}]}}'
+        )
+
+        data = await _call_gemini(prompt, gemini_key)
+        if data and "questions" in data and len(data["questions"]) > 0:
+            _save_db_cache(current_user.id, cache_key, data, db)
+            return data
+
+    # Local fallback — generic questions that at least force recall
     title = topic.title
-    desc  = topic.description or ""
-    return {"questions": [
+    fallback = {"questions": [
         {
             "q": f"What is the primary purpose of {title}?",
             "options": [
-                f"To replace all existing programming paradigms",
+                "To replace all existing programming paradigms",
                 f"To understand and apply core concepts of {title}",
-                f"To generate random outputs without structure",
-                f"To slow down application performance intentionally",
+                "To generate random outputs without structure",
+                "To slow down application performance intentionally",
             ],
             "answer": 1,
         },
         {
             "q": f"Which statement about {title} is most accurate?",
             "options": [
-                f"It only applies to hardware-level programming",
-                f"It was invented last year and has no real applications",
-                f"It is a well-defined concept used in software development",
-                f"It is only relevant to mobile app development",
+                "It only applies to hardware-level programming",
+                "It was invented last year and has no real applications",
+                "It is a well-defined concept used in software development",
+                "It is only relevant to mobile app development",
             ],
             "answer": 2,
         },
         {
             "q": f"After learning {title}, a developer would be able to:",
             "options": [
-                f"Apply its concepts to solve related real-world problems",
-                f"Eliminate the need for any other programming knowledge",
-                f"Build only front-end applications",
-                f"Only work with legacy codebases",
+                "Apply its concepts to solve related real-world problems",
+                "Eliminate the need for any other programming knowledge",
+                "Build only front-end applications",
+                "Only work with legacy codebases",
             ],
             "answer": 0,
         },
         {
             "q": f"Which best describes a key characteristic of {title}?",
             "options": [
-                f"It is rarely used in modern software projects",
-                f"It requires specialised hardware to implement",
-                f"It has well-documented best practices in the industry",
-                f"It is only applicable to academic research",
+                "It is rarely used in modern software projects",
+                "It requires specialised hardware to implement",
+                "It has well-documented best practices in the industry",
+                "It is only applicable to academic research",
             ],
             "answer": 2,
         },
         {
             "q": f"When would a developer most likely use {title}?",
             "options": [
-                f"Never, because it is an outdated concept",
-                f"Only when building operating systems",
-                f"When solving a problem that this topic is specifically designed to address",
-                f"Only in large enterprise applications",
+                "Never, because it is an outdated concept",
+                "Only when building operating systems",
+                "When solving a problem that this topic is specifically designed to address",
+                "Only in large enterprise applications",
             ],
             "answer": 2,
         },
     ]}
+    return fallback
 
 
 @router.get("/course/{course_id}/quiz")
 async def get_course_quiz(course_id: int, db: Session = Depends(get_db),
                           current_user: User = Depends(get_current_user)):
     """
-    Generate a comprehensive course-completion quiz (10 questions).
-    For code-heavy courses (DSA, Python, Web) some questions are coding challenges.
+    Generate a personalised course-completion exam (10 questions).
+    For coding courses (DSA, Python, Web) includes 4 coding challenges.
+    Personalised using the user's learning history — cached per user+course in DB.
     """
     cache_key = f"course:{course_id}"
-    if cache_key in _quiz_cache:
-        return _quiz_cache[cache_key]
+
+    cached = _load_db_cache(current_user.id, cache_key, db)
+    if cached:
+        return cached
 
     # Courses with coding challenges: 1=DSA, 2=Python, 3=Web
     CODING_COURSE_IDS = {1, 2, 3}
     is_coding_course = course_id in CODING_COURSE_IDS
 
-    # Fetch all topics in the course (order_index hundreds digit = course_id)
     low = course_id * 100
     high = (course_id + 1) * 100
     topics = (
@@ -208,76 +308,62 @@ async def get_course_quiz(course_id: int, db: Session = Depends(get_db),
 
     gemini_key = os.environ.get("GEMINI_API_KEY", "")
 
-    if is_coding_course:
-        prompt = (
-            f"Generate a challenging course-completion exam for a student who has studied these topics:\n"
-            f"{topic_list}\n\n"
-            f"Create exactly 10 questions total:\n"
-            f"- 6 multiple choice questions (type: 'mcq')\n"
-            f"- 4 coding challenge questions (type: 'code')\n\n"
-            f"Rules for MCQ (make these HARD — final exam level):\n"
-            f"- Test deep understanding, edge cases, and real-world application — NOT definitions or trivia\n"
-            f"- Include questions about time/space complexity, common bugs, tricky behaviour, design trade-offs\n"
-            f"- 4 options each, only one correct\n"
-            f"- All wrong options must be highly plausible — a student who half-understands should struggle\n"
-            f"- 'answer' is the 0-based index of the correct option\n"
-            f"- Vary correct answer positions\n\n"
-            f"Rules for coding questions (LeetCode easy-to-medium difficulty):\n"
-            f"- Concrete algorithmic problems — NOT 'write a class' or 'explain a concept'\n"
-            f"- Examples: 'Return indices of two numbers that sum to target', 'Find the longest substring without repeating characters', 'Reverse a linked list'\n"
-            f"- Each must have a clear problem statement in 'q' including input/output format\n"
-            f"- Provide a Python starter template in 'starter' matching the function signature\n"
-            f"- Provide 4-5 test cases in 'test_cases': [{{'input': [...], 'expected': ...}}]\n"
-            f"  where 'input' is a list of positional arguments matching the starter function signature\n"
-            f"- Include at least one edge case (empty input, single element, duplicates, etc.)\n"
-            f"- 'language': 'python'\n\n"
-            f"Return ONLY valid JSON, no markdown, no extra text.\n"
-            f"Format:\n"
-            f'{{"questions": ['
-            f'{{"type": "mcq", "q": "...", "options": ["...", "...", "...", "..."], "answer": 0}}, '
-            f'{{"type": "code", "q": "Given an array of integers nums and an integer target, return indices of the two numbers that add up to target.\\nInput: nums=[2,7,11,15], target=9 → Output: [0,1]", '
-            f'"starter": "def solution(nums, target):\\n    pass", '
-            f'"test_cases": [{{"input": [[2,7,11,15], 9], "expected": [0,1]}}, {{"input": [[3,2,4], 6], "expected": [1,2]}}], "language": "python"}}'
-            f']}}'
-        )
-    else:
-        prompt = (
-            f"Generate a challenging course-completion exam for a student who has studied these topics:\n"
-            f"{topic_list}\n\n"
-            f"Create exactly 10 multiple choice questions (type: 'mcq').\n\n"
-            f"Rules (make these HARD — this is a final exam, not a warm-up):\n"
-            f"- Test deep understanding, application, and analysis — NOT memorised definitions\n"
-            f"- Include scenario-based questions, trade-off comparisons, and edge cases\n"
-            f"- 4 options each, only one correct\n"
-            f"- All wrong options must be highly plausible — a student who half-understands should struggle\n"
-            f"- 'answer' is the 0-based index of the correct option\n"
-            f"- Vary correct answer positions\n"
-            f"- Cover a spread of topics — do not cluster on one topic\n\n"
-            f"Return ONLY valid JSON, no markdown, no extra text.\n"
-            f"Format:\n"
-            f'{{"questions": [{{"type": "mcq", "q": "...", "options": ["...", "...", "...", "..."], "answer": 0}}]}}'
-        )
-
     if gemini_key:
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
-                    json={"contents": [{"parts": [{"text": prompt}]}]},
-                )
-            resp.raise_for_status()
-            raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-            if raw.startswith("```"):
-                raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-            data = json.loads(raw)
-            if "questions" in data and len(data["questions"]) >= 5:
-                result = {"questions": data["questions"], "has_coding": is_coding_course}
-                _quiz_cache[cache_key] = result
-                return result
-        except Exception:
-            pass  # fall through to fallback
+        ctx = _get_user_context(current_user.id, db)
+        user_block = _build_user_context_block(ctx)
 
-    # Fallback: real hardcoded questions per course
+        personalisation = (
+            f"\nStudent learning profile:\n{user_block}\n"
+            f"Use this profile to:\n"
+            f"- Ask harder questions on topics they have completed and revisited\n"
+            f"- Include at least one question probing their weak-area resources if relevant\n"
+            f"- Ensure coverage is spread across all course topics, not clustered\n"
+        ) if user_block else ""
+
+        if is_coding_course:
+            prompt = (
+                f"Generate a challenging course-completion exam for a student who has studied:\n"
+                f"{topic_list}\n"
+                f"{personalisation}\n"
+                f"Create exactly 10 questions total:\n"
+                f"- 6 multiple choice questions (type: 'mcq')\n"
+                f"- 4 coding challenge questions (type: 'code')\n\n"
+                f"MCQ rules (HARD — final exam level):\n"
+                f"- Test deep understanding, edge cases, time/space complexity, design trade-offs\n"
+                f"- 4 options each, only one correct; all wrong options highly plausible\n"
+                f"- 'answer' is the 0-based index; vary correct answer positions\n\n"
+                f"Coding question rules (LeetCode easy-to-medium):\n"
+                f"- Concrete algorithmic problems with clear input/output format in 'q'\n"
+                f"- Python starter in 'starter'; 4-5 test cases in 'test_cases' with at least one edge case\n"
+                f"- 'test_cases': [{{\"input\": [...positional args], \"expected\": ...}}]\n"
+                f"- 'language': 'python'\n\n"
+                f"Return ONLY valid JSON, no markdown.\n"
+                f'Format: {{"questions": ['
+                f'{{"type":"mcq","q":"...","options":["...","...","...","..."],"answer":0}},'
+                f'{{"type":"code","q":"...","starter":"def solution(...):\\n    pass","test_cases":[{{"input":[...],"expected":...}}],"language":"python"}}'
+                f']}}'
+            )
+        else:
+            prompt = (
+                f"Generate a challenging course-completion exam for a student who has studied:\n"
+                f"{topic_list}\n"
+                f"{personalisation}\n"
+                f"Create exactly 10 multiple choice questions (type: 'mcq').\n\n"
+                f"Rules (HARD — final exam):\n"
+                f"- Test deep understanding, application, edge cases — NOT memorised definitions\n"
+                f"- 4 options each, one correct; all wrong options highly plausible\n"
+                f"- 'answer' is 0-based index; vary positions; cover all topics\n\n"
+                f"Return ONLY valid JSON, no markdown.\n"
+                f'Format: {{"questions": [{{"type":"mcq","q":"...","options":["...","...","...","..."],"answer":0}}]}}'
+            )
+
+        data = await _call_gemini(prompt, gemini_key, timeout=30.0)
+        if data and "questions" in data and len(data["questions"]) >= 5:
+            result = {"questions": data["questions"], "has_coding": is_coding_course}
+            _save_db_cache(current_user.id, cache_key, result, db)
+            return result
+
+    # Hardcoded fallback per course
     FALLBACK_QUESTIONS = {
         1: [  # DSA
             {"type":"mcq","q":"What is the time complexity of binary search on a sorted array of n elements?","options":["O(n)","O(log n)","O(n log n)","O(1)"],"answer":1},
@@ -345,17 +431,16 @@ async def get_course_quiz(course_id: int, db: Session = Depends(get_db),
     if fallback:
         return {"questions": fallback, "has_coding": False}
 
-    # Last resort generic fallback if course_id not in map
     generic = []
     for t in topics[:10]:
         generic.append({
             "type": "mcq",
             "q": f"Which statement best describes '{t.title.split(': ')[-1]}'?",
             "options": [
-                f"A foundational concept with well-documented applications",
-                f"Applicable only to legacy systems",
-                f"Rarely used in modern development",
-                f"Only relevant at hardware level",
+                "A foundational concept with well-documented applications",
+                "Applicable only to legacy systems",
+                "Rarely used in modern development",
+                "Only relevant at hardware level",
             ],
             "answer": 0,
         })
@@ -374,42 +459,32 @@ class CodeCheckRequest(BaseModel):
 async def check_code_answer(data: CodeCheckRequest,
                              current_user: User = Depends(get_current_user)):
     """
-    Send user's code solution to Gemini to evaluate against test cases.
+    Use Gemini to evaluate a user's code submission against test cases.
     Returns { passed: bool, feedback: str, results: [{input, expected, got, ok}] }
+    Gemini traces through the code and checks each test case — no sandbox needed.
     """
     gemini_key = os.environ.get("GEMINI_API_KEY", "")
     if not gemini_key:
-        # No Gemini — attempt simple Python execution for python code
         return {"passed": True, "feedback": "Auto-passed (no evaluator configured)", "results": []}
 
     test_cases_str = json.dumps(data.test_cases, indent=2)
     prompt = (
-        f"You are a code evaluator. A student submitted the following {data.language} code:\n\n"
+        f"You are a code evaluator. A student submitted this {data.language} solution:\n\n"
         f"```{data.language}\n{data.code}\n```\n\n"
-        f"Test cases to check (each has 'input' as a list of arguments and 'expected' as the return value):\n"
+        f"Test cases (each 'input' is a list of positional arguments, 'expected' is the return value):\n"
         f"{test_cases_str}\n\n"
-        f"Evaluate whether the code produces the correct output for EACH test case.\n"
-        f"Run the code mentally or trace through it carefully.\n"
+        f"Trace through the code carefully for EACH test case.\n"
         f"Return ONLY valid JSON, no markdown:\n"
-        f'{{"passed": true/false, "feedback": "brief explanation", '
-        f'"results": [{{"input": ..., "expected": ..., "got": ..., "ok": true/false}}]}}\n'
-        f"'passed' is true only if ALL test cases pass."
+        f'{{"passed": true, "feedback": "All test cases passed.", '
+        f'"results": [{{"input": ..., "expected": ..., "got": ..., "ok": true}}]}}\n'
+        f"'passed' is true only if ALL test cases pass. "
+        f"'feedback' should explain the first failing case if any."
     )
 
-    try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            resp = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={gemini_key}",
-                json={"contents": [{"parts": [{"text": prompt}]}]},
-            )
-        resp.raise_for_status()
-        raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-        result = json.loads(raw)
+    result = await _call_gemini(prompt, gemini_key, timeout=20.0)
+    if result:
         return result
-    except Exception as e:
-        return {"passed": False, "feedback": f"Evaluation failed: {str(e)}", "results": []}
+    return {"passed": False, "feedback": "Evaluation failed — check your code and try again.", "results": []}
 
 
 @router.get("/progress/me")
@@ -422,9 +497,7 @@ def my_progress(current_user: User = Depends(get_current_user), db: Session = De
 def my_activity(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Returns daily completed-resource counts for last 30 days + total stats."""
     from datetime import datetime, timedelta
-    from app.models.models import Engagement, Resource, Topic, TopicPrerequisite
 
-    # Daily activity: count resources completed per day (last 30 days)
     since = datetime.utcnow() - timedelta(days=29)
     engagements = (
         db.query(Engagement)
@@ -438,7 +511,6 @@ def my_activity(current_user: User = Depends(get_current_user), db: Session = De
             day = e.completed_at.strftime("%Y-%m-%d")
             daily[day] = daily.get(day, 0) + 1
 
-    # Total stats
     total_completed_resources = db.query(Engagement).filter_by(
         user_id=current_user.id, completed=True).count()
     total_topics_done = db.query(UserProgress).filter_by(
@@ -447,8 +519,9 @@ def my_activity(current_user: User = Depends(get_current_user), db: Session = De
     total_seconds = sum(e.time_spent or 0 for e in total_time)
 
     return {
-        "daily": daily,          # {"2026-06-20": 3, ...}
+        "daily": daily,
         "total_resources": total_completed_resources,
         "total_topics": total_topics_done,
         "total_minutes": total_seconds // 60,
     }
+
