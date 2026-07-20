@@ -97,19 +97,34 @@ async def _call_gemini(prompt: str, gemini_key: str, timeout: float = 25.0) -> O
     return None
 
 
-def _load_db_cache(user_id: int, cache_key: str, db: Session) -> Optional[dict]:
+def _load_db_cache(user_id: int, cache_key: str, db: Session, resource_hash: str = None) -> Optional[dict]:
+    """
+    Load cached quiz. If resource_hash is provided (topic quizzes), invalidate
+    the cache when the resource list has changed since last generation.
+    """
     entry = db.query(QuizCache).filter_by(user_id=user_id, cache_key=cache_key).first()
-    if entry:
-        return json.loads(entry.json_data)
-    return None
+    if not entry:
+        return None
+    # If a hash is provided and it doesn't match, resources changed — invalidate
+    if resource_hash and entry.resource_hash != resource_hash:
+        db.delete(entry)
+        db.commit()
+        return None
+    return json.loads(entry.json_data)
 
 
-def _save_db_cache(user_id: int, cache_key: str, data: dict, db: Session) -> None:
+def _save_db_cache(user_id: int, cache_key: str, data: dict, db: Session, resource_hash: str = None) -> None:
     existing = db.query(QuizCache).filter_by(user_id=user_id, cache_key=cache_key).first()
     if existing:
         existing.json_data = json.dumps(data)
+        existing.resource_hash = resource_hash
     else:
-        db.add(QuizCache(user_id=user_id, cache_key=cache_key, json_data=json.dumps(data)))
+        db.add(QuizCache(
+            user_id=user_id,
+            cache_key=cache_key,
+            json_data=json.dumps(data),
+            resource_hash=resource_hash,
+        ))
     db.commit()
 
 
@@ -176,18 +191,34 @@ async def get_quiz(topic_id: int, db: Session = Depends(get_db),
                    current_user: User = Depends(get_current_user)):
     """
     Generate a personalised 5-question MCQ quiz for a topic.
-    Uses the user's learning history (completed topics, weak/strong areas)
-    to tailor question difficulty and focus.
-    Result is cached per user+topic in the DB — Gemini is only called once per user per topic.
+    Questions are based on the actual approved resources in the topic
+    (titles + URLs) so they reflect what the user was supposed to watch/read.
+    Also uses the user's learning history to adjust difficulty.
+    Cache is invalidated automatically when the resource list changes.
     """
+    import hashlib
+    from app.models.models import ResourceStatus
+
     topic = db.query(Topic).filter(Topic.id == topic_id).first()
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
 
-    cache_key = f"topic:{topic_id}"
+    # Fetch approved resources for this topic
+    approved_resources = (
+        db.query(Resource)
+        .filter_by(topic_id=topic_id)
+        .filter(Resource.status == ResourceStatus.approved)
+        .all()
+    )
 
-    # Check DB cache first — avoids re-calling Gemini on server restart
-    cached = _load_db_cache(current_user.id, cache_key, db)
+    # Build a hash of current resource titles — used to detect list changes
+    resource_fingerprint = ",".join(
+        sorted(f"{r.id}:{r.title}" for r in approved_resources)
+    )
+    resource_hash = hashlib.md5(resource_fingerprint.encode()).hexdigest()
+
+    cache_key = f"topic:{topic_id}"
+    cached = _load_db_cache(current_user.id, cache_key, db, resource_hash=resource_hash)
     if cached:
         return cached
 
@@ -199,18 +230,33 @@ async def get_quiz(topic_id: int, db: Session = Depends(get_db),
 
         personalisation = (
             f"\nStudent learning profile:\n{user_block}\n"
-            f"Use this profile to:\n"
-            f"- Ask harder questions on topics they have already completed\n"
-            f"- Focus on concepts related to their weak areas if relevant\n"
-            f"- Skip overly basic definitions if they have strong engagement history\n"
+            f"Use this to ask harder questions on completed topics and probe weak areas.\n"
         ) if user_block else ""
+
+        # Build resource context — the actual content the user was supposed to study
+        if approved_resources:
+            resource_lines = "\n".join(
+                f"- [{r.resource_type or 'resource'}] {r.title} ({r.url})"
+                for r in approved_resources
+            )
+            resource_context = (
+                f"\nThe topic contains these specific learning resources:\n"
+                f"{resource_lines}\n\n"
+                f"Generate questions that are DIRECTLY based on these resources. "
+                f"Reference the specific content implied by their titles — "
+                f"a student who watched/read these should be able to answer. "
+                f"Do NOT ask generic questions that anyone could Google.\n"
+            )
+        else:
+            resource_context = ""
 
         prompt = (
             f'Generate exactly 5 multiple choice questions to test knowledge of "{topic.title}".\n'
             f'Topic description: {topic.description or "a programming/tech topic"}\n'
+            f'{resource_context}'
             f'{personalisation}\n'
             f'Rules:\n'
-            f'- Test actual understanding — NOT trivial definitions or feelings\n'
+            f'- Test actual understanding of the specific content — NOT generic definitions\n'
             f'- Each question must have exactly 4 options\n'
             f'- Only one option is correct\n'
             f'- "answer" is the 0-based index of the correct option\n'
@@ -222,10 +268,10 @@ async def get_quiz(topic_id: int, db: Session = Depends(get_db),
 
         data = await _call_gemini(prompt, gemini_key)
         if data and "questions" in data and len(data["questions"]) > 0:
-            _save_db_cache(current_user.id, cache_key, data, db)
+            _save_db_cache(current_user.id, cache_key, data, db, resource_hash=resource_hash)
             return data
 
-    # Local fallback — generic questions that at least force recall
+    # Local fallback
     title = topic.title
     fallback = {"questions": [
         {

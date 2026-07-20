@@ -194,6 +194,9 @@ class QuizCache(Base):
     # cache_key format: "topic:{topic_id}" or "course:{course_id}"
     cache_key = Column(String, nullable=False)
     json_data = Column(Text, nullable=False)   # serialised JSON quiz
+    # MD5 of the resource list used to generate this quiz.
+    # If resources change, hash won't match and quiz is regenerated.
+    resource_hash = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     __table_args__ = (

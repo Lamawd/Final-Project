@@ -85,6 +85,7 @@ def startup():
                 created_at TIMESTAMP DEFAULT NOW(),
                 UNIQUE (user_id, cache_key)
             )""",
+            "ALTER TABLE quiz_cache ADD COLUMN resource_hash VARCHAR",
         ]
         for sql in migrations:
             try:
