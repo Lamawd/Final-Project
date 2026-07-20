@@ -12,7 +12,7 @@ import httpx, os, json
 
 router = APIRouter(prefix="/topics", tags=["topics"])
 
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-2.0-flash"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 
 
