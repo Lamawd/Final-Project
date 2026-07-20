@@ -72,20 +72,29 @@ def _build_user_context_block(ctx: dict) -> str:
 
 
 async def _call_gemini(prompt: str, gemini_key: str, timeout: float = 25.0) -> Optional[dict]:
-    """Call Gemini API and return parsed JSON, or None on any failure."""
-    try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            resp = await client.post(
-                f"{GEMINI_URL}?key={gemini_key}",
-                json={"contents": [{"parts": [{"text": prompt}]}]},
-            )
-        resp.raise_for_status()
-        raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
-        return json.loads(raw)
-    except Exception:
-        return None
+    """Call Gemini API and return parsed JSON, or None on any failure.
+    Retries once after 5 seconds on 429 (free tier rate limit)."""
+    import asyncio
+    for attempt in range(2):  # try twice — once immediately, once after a wait
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                resp = await client.post(
+                    f"{GEMINI_URL}?key={gemini_key}",
+                    json={"contents": [{"parts": [{"text": prompt}]}]},
+                )
+            if resp.status_code == 429:
+                if attempt == 0:
+                    await asyncio.sleep(6)  # wait 6s then retry once
+                    continue
+                return None  # still 429 after retry — give up
+            resp.raise_for_status()
+            raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+            return json.loads(raw)
+        except Exception:
+            return None
+    return None
 
 
 def _load_db_cache(user_id: int, cache_key: str, db: Session) -> Optional[dict]:
