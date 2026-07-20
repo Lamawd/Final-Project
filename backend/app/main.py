@@ -77,6 +77,14 @@ def startup():
                 admin_note VARCHAR,
                 created_at TIMESTAMP DEFAULT NOW()
             )""",
+            """CREATE TABLE IF NOT EXISTS quiz_cache (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id),
+                cache_key VARCHAR NOT NULL,
+                json_data TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE (user_id, cache_key)
+            )""",
         ]
         for sql in migrations:
             try:
