@@ -12,8 +12,13 @@ import httpx, os, json
 
 router = APIRouter(prefix="/topics", tags=["topics"])
 
-GEMINI_MODEL = "gemini-2.0-flash"
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+# ---------------------------------------------------------------------------
+# AI provider — Groq (free, no billing required)
+# Model: llama-3.3-70b-versatile  — strong JSON output, fast on Groq LPU
+# Fallback: if GROQ_API_KEY is missing, hardcoded questions are used instead
+# ---------------------------------------------------------------------------
+GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_URL   = "https://api.groq.com/openai/v1/chat/completions"
 
 
 def _get_user_context(user_id: int, db: Session) -> dict:
@@ -71,24 +76,42 @@ def _build_user_context_block(ctx: dict) -> str:
     return "\n".join(lines)
 
 
-async def _call_gemini(prompt: str, gemini_key: str, timeout: float = 25.0) -> Optional[dict]:
-    """Call Gemini API and return parsed JSON, or None on any failure.
-    Retries once after 5 seconds on 429 (free tier rate limit)."""
+async def _call_ai(prompt: str, api_key: str, timeout: float = 25.0) -> Optional[dict]:
+    """
+    Call Groq API (OpenAI-compatible) and return parsed JSON, or None on failure.
+    Retries once after 6 s on 429 (rate limit).
+    """
     import asyncio
-    for attempt in range(2):  # try twice — once immediately, once after a wait
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    body = {
+        "model": GROQ_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are a quiz generator for a programming learning platform. "
+                    "Always respond with valid JSON only — no markdown, no explanation, no extra text."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.7,
+        "max_tokens": 2048,
+    }
+    for attempt in range(2):
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
-                resp = await client.post(
-                    f"{GEMINI_URL}?key={gemini_key}",
-                    json={"contents": [{"parts": [{"text": prompt}]}]},
-                )
+                resp = await client.post(GROQ_URL, headers=headers, json=body)
             if resp.status_code == 429:
                 if attempt == 0:
-                    await asyncio.sleep(6)  # wait 6s then retry once
+                    await asyncio.sleep(6)
                     continue
-                return None  # still 429 after retry — give up
+                return None
             resp.raise_for_status()
-            raw = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
+            raw = resp.json()["choices"][0]["message"]["content"].strip()
             if raw.startswith("```"):
                 raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
             return json.loads(raw)
@@ -222,9 +245,9 @@ async def get_quiz(topic_id: int, db: Session = Depends(get_db),
     if cached:
         return cached
 
-    gemini_key = os.environ.get("GEMINI_API_KEY", "")
+    api_key = os.environ.get("GROQ_API_KEY", "")
 
-    if gemini_key:
+    if api_key:
         ctx = _get_user_context(current_user.id, db)
         user_block = _build_user_context_block(ctx)
 
@@ -266,7 +289,7 @@ async def get_quiz(topic_id: int, db: Session = Depends(get_db),
             f'Format: {{"questions": [{{"q": "...", "options": ["o0","o1","o2","o3"], "answer": 2}}]}}'
         )
 
-        data = await _call_gemini(prompt, gemini_key)
+        data = await _call_ai(prompt, api_key)
         if data and "questions" in data and len(data["questions"]) > 0:
             _save_db_cache(current_user.id, cache_key, data, db, resource_hash=resource_hash)
             return data
@@ -361,9 +384,9 @@ async def get_course_quiz(course_id: int, db: Session = Depends(get_db),
         f"- {t.title}: {t.description or 'no description'}" for t in topics
     )
 
-    gemini_key = os.environ.get("GEMINI_API_KEY", "")
+    api_key = os.environ.get("GROQ_API_KEY", "")
 
-    if gemini_key:
+    if api_key:
         ctx = _get_user_context(current_user.id, db)
         user_block = _build_user_context_block(ctx)
 
@@ -412,7 +435,7 @@ async def get_course_quiz(course_id: int, db: Session = Depends(get_db),
                 f'Format: {{"questions": [{{"type":"mcq","q":"...","options":["...","...","...","..."],"answer":0}}]}}'
             )
 
-        data = await _call_gemini(prompt, gemini_key, timeout=30.0)
+        data = await _call_ai(prompt, api_key, timeout=30.0)
         if data and "questions" in data and len(data["questions"]) >= 5:
             result = {"questions": data["questions"], "has_coding": is_coding_course}
             _save_db_cache(current_user.id, cache_key, result, db)
@@ -518,8 +541,8 @@ async def check_code_answer(data: CodeCheckRequest,
     Returns { passed: bool, feedback: str, results: [{input, expected, got, ok}] }
     Gemini traces through the code and checks each test case — no sandbox needed.
     """
-    gemini_key = os.environ.get("GEMINI_API_KEY", "")
-    if not gemini_key:
+    api_key = os.environ.get("GROQ_API_KEY", "")
+    if not api_key:
         return {"passed": True, "feedback": "Auto-passed (no evaluator configured)", "results": []}
 
     test_cases_str = json.dumps(data.test_cases, indent=2)
@@ -536,7 +559,7 @@ async def check_code_answer(data: CodeCheckRequest,
         f"'feedback' should explain the first failing case if any."
     )
 
-    result = await _call_gemini(prompt, gemini_key, timeout=20.0)
+    result = await _call_ai(prompt, api_key, timeout=20.0)
     if result:
         return result
     return {"passed": False, "feedback": "Evaluation failed — check your code and try again.", "results": []}
