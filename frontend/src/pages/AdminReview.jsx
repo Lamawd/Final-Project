@@ -37,6 +37,13 @@ export default function AdminReview() {
     setCourseReqs((prev) => prev.map((r) => r.id === id ? { ...r, status: approved ? "approved" : "rejected" } : r));
   };
 
+  const deleteResource = async (id) => {
+    if (!confirm("Delete this resource permanently? This cannot be undone.")) return;
+    await api.delete(`/resources/${id}`);
+    setAll((prev) => prev.filter((r) => r.id !== id));
+    setPending((prev) => prev.filter((r) => r.id !== id));
+  };
+
   const deleteUser = async (id) => {
     if (!confirm("Delete this user? This cannot be undone.")) return;
     await api.delete(`/auth/admin/users/${id}`);
@@ -104,6 +111,13 @@ export default function AdminReview() {
                 <span style={{ fontSize: "0.78rem", fontWeight: 600, color: STATUS_COLOR[r.status] }}>
                   {r.status}
                 </span>
+                <button
+                  className="btn btn-reject"
+                  style={{ fontSize: "0.75rem", padding: "3px 10px" }}
+                  onClick={() => deleteResource(r.id)}
+                >
+                  <XCircle size={11} style={{ display: "inline", marginRight: 3 }} />Delete
+                </button>
               </div>
             </div>
           ))}

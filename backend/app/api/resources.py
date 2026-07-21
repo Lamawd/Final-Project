@@ -245,6 +245,17 @@ def pending_resources(db: Session = Depends(get_db)):
     } for r in resources]
 
 
+@router.delete("/{resource_id}", dependencies=[Depends(require_admin)])
+def delete_resource(resource_id: int, db: Session = Depends(get_db)):
+    """Admin can permanently delete any resource regardless of status."""
+    resource = db.query(Resource).filter_by(id=resource_id).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Not found")
+    db.delete(resource)
+    db.commit()
+    return {"ok": True}
+
+
 @router.post("/{resource_id}/review")
 def review(resource_id: int, approved: bool, _: User = Depends(require_admin), db: Session = Depends(get_db)):
     resource = db.query(Resource).filter(Resource.id == resource_id).first()
