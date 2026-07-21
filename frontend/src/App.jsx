@@ -15,6 +15,7 @@ import Topics from "./pages/Topics";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import ResourceLibrary from "./pages/ResourceLibrary";
 
 import ErrorBoundary from "./components/ErrorBoundary";
 
@@ -52,6 +53,7 @@ function Layout() {
         <Route path="/suggest" element={<Navigate to="/profile" replace />} />
         <Route path="/progress" element={<Protected><Progress /></Protected>} />
         <Route path="/profile" element={<Protected><UserProfile /></Protected>} />
+        <Route path="/library" element={<Protected><ResourceLibrary /></Protected>} />
         <Route path="/admin" element={<AdminOnly><AdminReview /></AdminOnly>} />
         <Route path="*" element={<NotFound />} />
       </Routes>

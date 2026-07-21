@@ -87,6 +87,40 @@ def get_by_topic(topic_id: int, db: Session = Depends(get_db)):
     return result
 
 
+@router.get("/library")
+def resource_library(db: Session = Depends(get_db)):
+    """Public library of all approved community resources across all topics."""
+    resources = (
+        db.query(Resource)
+        .filter_by(status=ResourceStatus.approved)
+        .order_by(Resource.created_at.desc())
+        .all()
+    )
+    result = []
+    for r in resources:
+        stars = [rt.stars for rt in r.ratings]
+        avg = round(sum(stars) / len(stars), 1) if stars else 0.0
+        topic_title = r.topic.title if r.topic else ""
+        # Derive course name from topic title prefix (e.g. "DSA: Arrays" → "DSA")
+        parts = topic_title.split(": ", 1)
+        course = parts[0] if len(parts) == 2 else ""
+        subtopic = parts[1] if len(parts) == 2 else topic_title
+        result.append({
+            "id": r.id,
+            "title": r.title,
+            "url": r.url,
+            "type": r.resource_type,
+            "course": course,
+            "topic": subtopic,
+            "topic_id": r.topic_id,
+            "uploader": r.uploader.username if r.uploader else "unknown",
+            "avg_rating": avg,
+            "rating_count": len(stars),
+            "submitted": r.created_at.strftime("%b %d, %Y") if r.created_at else "",
+        })
+    return result
+
+
 @router.get("/{resource_id}/reviews")
 def get_reviews(resource_id: int, db: Session = Depends(get_db)):
     """Return all ratings with their comments for a resource."""

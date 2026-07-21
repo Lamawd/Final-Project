@@ -8,6 +8,7 @@ export default function Navbar() {
     <nav>
       <Link to="/" className="brand">Opic</Link>
       <Link to="/courses">Courses</Link>
+      <Link to="/library">Library</Link>
       <Link to="/progress">Progress</Link>
       {user?.is_admin && <Link to="/admin">Admin</Link>}
       <div className="nav-right">
