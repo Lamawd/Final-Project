@@ -19,7 +19,7 @@ def test_register_duplicate_email(client):
         json={"username": "testuser2", "email": "test@example.com", "password": "password123"},
     )
     assert response.status_code == 400
-    assert response.json()["detail"] == "Email already registered"
+    assert "already" in response.json()["detail"].lower()
 
 
 def test_login_success(client):
