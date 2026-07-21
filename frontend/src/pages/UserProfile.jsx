@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Clock, CheckCircle, XCircle, Inbox, Settings, Lock, Palette, Plus, X, BookOpen, User } from "lucide-react";
 import api from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { Link } from "react-router-dom";
 import { COURSES, courseOf } from "../courses";
 
 const STATUS_COLOR = { approved: "#10b981", pending: "#f59e0b", rejected: "#ef4444" };
@@ -295,6 +296,9 @@ export default function UserProfile() {
                   </div>
                 </>
               )}
+              <p style={{ marginTop: 14, fontSize: "0.82rem" }}>
+                <Link to="/library" style={{ color: "#6366f1" }}>Browse all approved community resources →</Link>
+              </p>
             </section>
 
             {/* Suggest a new course */}
