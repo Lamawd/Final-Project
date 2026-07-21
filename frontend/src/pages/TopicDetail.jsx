@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -49,6 +49,75 @@ export default function TopicDetail() {
   const [reviewData, setReviewData]     = useState({});
 
   const course = topic ? COURSES.find((c) => c.id === courseOf(topic)) : null;
+
+  // ── Per-resource time tracking ──────────────────────────────────────────
+  // Tracks time spent on the page per resource (approximated by page-open time)
+  const resourceTimers = useRef({});  // { [rid]: { start: Date, accumulated: ms } }
+
+  const startTimer = useCallback((rid) => {
+    if (!resourceTimers.current[rid]) {
+      resourceTimers.current[rid] = { start: Date.now(), accumulated: 0 };
+    } else if (!resourceTimers.current[rid].start) {
+      resourceTimers.current[rid].start = Date.now();
+    }
+  }, []);
+
+  const pauseTimer = useCallback((rid) => {
+    const t = resourceTimers.current[rid];
+    if (t?.start) {
+      t.accumulated += Date.now() - t.start;
+      t.start = null;
+    }
+  }, []);
+
+  const getTimeSecs = useCallback((rid) => {
+    const t = resourceTimers.current[rid];
+    if (!t) return 0;
+    const extra = t.start ? Date.now() - t.start : 0;
+    return Math.round((t.accumulated + extra) / 1000);
+  }, []);
+
+  // ── YouTube watch-completion tracking via IFrame API ───────────────────
+  // ytPlayers: { [rid]: YT.Player }  ytProgress: { [rid]: float 0-1 }
+  const ytPlayers  = useRef({});
+  const ytProgress = useRef({});   // last known completion ratio
+  const ytPollRef  = useRef(null); // interval handle
+
+  // Load the YouTube IFrame API script once
+  useEffect(() => {
+    if (window.YT) return;
+    const tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.body.appendChild(tag);
+  }, []);
+
+  // Poll all active YT players every 3 s to record watch progress
+  useEffect(() => {
+    ytPollRef.current = setInterval(() => {
+      Object.entries(ytPlayers.current).forEach(([rid, player]) => {
+        try {
+          const dur = player.getDuration?.();
+          const cur = player.getCurrentTime?.();
+          if (dur && dur > 0) {
+            ytProgress.current[rid] = Math.min(cur / dur, 1.0);
+          }
+        } catch {}
+      });
+    }, 3000);
+    return () => clearInterval(ytPollRef.current);
+  }, []);
+
+  // Flush engagement for a resource (called on pause/stop/mark-done/unload)
+  const flushEngage = useCallback((rid, completed = null) => {
+    const secs = getTimeSecs(rid);
+    const wc   = ytProgress.current[rid] ?? (resourceDone[rid] ? 1.0 : 0.0);
+    api.post(`/resources/${rid}/engage`, {
+      watch_completion: completed === false ? wc : (completed ? Math.max(wc, 0.9) : wc),
+      revisit_count: 0,
+      completed: completed ?? !!resourceDone[rid],
+      time_spent: secs,
+    }).catch(() => {});
+  }, [getTimeSecs, resourceDone]);
 
   const initReviewData = (resId) => {
     setReviewData((prev) => prev[resId] ? prev : {
@@ -117,25 +186,24 @@ export default function TopicDetail() {
     }).catch(() => {});
   }, [id]);
 
-  const pageStart = useRef(null);
-  const pageTime  = useRef(0);
-
+  // Start timers for all resources when they load; flush on page leave
   useEffect(() => {
     if (resources.length === 0) return;
-    pageStart.current = Date.now();
-    const pause  = () => { if (pageStart.current) { pageTime.current += Date.now() - pageStart.current; pageStart.current = null; } };
-    const resume = () => { if (!pageStart.current) pageStart.current = Date.now(); };
-    const flush  = () => {
-      pause();
-      const secs = Math.round(pageTime.current / 1000);
-      if (secs > 0) {
-        const rid = resources[0]?.id;
-        if (rid) api.post(`/resources/${rid}/engage`, { watch_completion: 0, revisit_count: 0, completed: !!resourceDone[rid], time_spent: secs });
-      }
+    resources.forEach((r) => startTimer(r.id));
+
+    const handleVisibility = () => {
+      if (document.hidden) resources.forEach((r) => pauseTimer(r.id));
+      else                  resources.forEach((r) => startTimer(r.id));
     };
-    document.addEventListener("visibilitychange", () => document.hidden ? pause() : resume());
-    window.addEventListener("beforeunload", flush);
-    return () => { flush(); window.removeEventListener("beforeunload", flush); };
+    const handleUnload = () => resources.forEach((r) => flushEngage(r.id));
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("beforeunload", handleUnload);
+    return () => {
+      handleUnload();
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("beforeunload", handleUnload);
+    };
   }, [resources]);
 
   useEffect(() => {
@@ -144,18 +212,9 @@ export default function TopicDetail() {
     }
   }, [resourceDone, resources]);
 
-  const stopTimer = (_rid) => {};
-  const getTime   = (_rid) => 0;
-
   const markResourceDone = async (resource) => {
     const next = !resourceDone[resource.id];
-    stopTimer(resource.id);
-    await api.post(`/resources/${resource.id}/engage`, {
-      watch_completion: next ? 1.0 : 0.0,
-      revisit_count: 0,
-      completed: next,
-      time_spent: getTime(resource.id),
-    });
+    flushEngage(resource.id, next);
     setResourceDone((prev) => ({ ...prev, [resource.id]: next }));
   };
 
@@ -320,11 +379,18 @@ export default function TopicDetail() {
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.3 }}
                       >
-                        <iframe
-                          src={`https://www.youtube.com/embed/${vid}`}
-                          title={r.title}
-                          allowFullScreen
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        <YouTubePlayer
+                          videoId={vid}
+                          resourceId={r.id}
+                          ytPlayers={ytPlayers}
+                          ytProgress={ytProgress}
+                          onProgress={(pct) => {
+                            // Auto-mark done when user watches ≥80%
+                            if (pct >= 0.8 && !resourceDone[r.id]) {
+                              flushEngage(r.id, true);
+                              setResourceDone((prev) => ({ ...prev, [r.id]: true }));
+                            }
+                          }}
                         />
                       </motion.div>
                     )}
@@ -490,6 +556,84 @@ export default function TopicDetail() {
           />
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+// ── YouTube IFrame API player component ─────────────────────────────────────
+// Mounts a div that the YT IFrame API turns into a real player.
+// Polls getCurrentTime/getDuration to track watch_completion accurately.
+function YouTubePlayer({ videoId, resourceId, ytPlayers, ytProgress, onProgress }) {
+  const containerRef = useRef(null);
+  const playerRef    = useRef(null);
+  const pollRef      = useRef(null);
+
+  useEffect(() => {
+    const mountPlayer = () => {
+      if (!containerRef.current || !window.YT?.Player) return;
+      const divId = `yt-player-${resourceId}`;
+      if (!document.getElementById(divId)) return;
+
+      playerRef.current = new window.YT.Player(divId, {
+        videoId,
+        playerVars: { rel: 0, modestbranding: 1 },
+        events: {
+          onReady: () => {
+            ytPlayers.current[resourceId] = playerRef.current;
+          },
+          onStateChange: (e) => {
+            // YT.PlayerState: PLAYING=1, PAUSED=2, ENDED=0
+            if (e.data === 1) {
+              // Started playing — begin polling
+              pollRef.current = setInterval(() => {
+                try {
+                  const dur = playerRef.current.getDuration();
+                  const cur = playerRef.current.getCurrentTime();
+                  if (dur > 0) {
+                    const pct = Math.min(cur / dur, 1.0);
+                    ytProgress.current[resourceId] = pct;
+                    onProgress(pct);
+                  }
+                } catch {}
+              }, 3000);
+            } else {
+              // Paused or ended — stop polling
+              clearInterval(pollRef.current);
+              if (e.data === 0) {
+                // Video ended — mark as fully watched
+                ytProgress.current[resourceId] = 1.0;
+                onProgress(1.0);
+              }
+            }
+          },
+        },
+      });
+    };
+
+    // YT API may not be ready yet — wait for onYouTubeIframeAPIReady
+    if (window.YT?.Player) {
+      mountPlayer();
+    } else {
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        if (prev) prev();
+        mountPlayer();
+      };
+    }
+
+    return () => {
+      clearInterval(pollRef.current);
+      try { playerRef.current?.destroy(); } catch {}
+      delete ytPlayers.current[resourceId];
+    };
+  }, [videoId, resourceId]);
+
+  return (
+    <div ref={containerRef} style={{ position: "relative", paddingBottom: "56.25%", height: 0 }}>
+      <div
+        id={`yt-player-${resourceId}`}
+        style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}
+      />
     </div>
   );
 }
