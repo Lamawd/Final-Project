@@ -55,44 +55,44 @@ def startup():
     db_type = "PostgreSQL" if db_url.startswith("postgresql") else "SQLite (ephemeral — data will NOT persist on Render!)"
     logger.info(f"Database: {db_type}")
     init_db()
-    # Safe column/table migrations for existing databases
+    # Safe column/table migrations for existing databases.
+    # Each runs in its own transaction so one failure doesn't block the rest.
     from app.core.database import engine
     import sqlalchemy as sa
-    with engine.connect() as conn:
-        migrations = [
-            "ALTER TABLE users ADD COLUMN avatar_url VARCHAR",
-            """CREATE TABLE IF NOT EXISTS comments (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL REFERENCES users(id),
-                resource_id INTEGER NOT NULL REFERENCES resources(id),
-                body TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT NOW()
-            )""",
-            """CREATE TABLE IF NOT EXISTS course_requests (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL REFERENCES users(id),
-                title VARCHAR NOT NULL,
-                description TEXT,
-                status VARCHAR DEFAULT 'pending',
-                admin_note VARCHAR,
-                created_at TIMESTAMP DEFAULT NOW()
-            )""",
-            """CREATE TABLE IF NOT EXISTS quiz_cache (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL REFERENCES users(id),
-                cache_key VARCHAR NOT NULL,
-                json_data TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT NOW(),
-                UNIQUE (user_id, cache_key)
-            )""",
-            "ALTER TABLE quiz_cache ADD COLUMN resource_hash VARCHAR",
-        ]
-        for sql in migrations:
-            try:
+    migrations = [
+        "ALTER TABLE users ADD COLUMN avatar_url VARCHAR",
+        """CREATE TABLE IF NOT EXISTS comments (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            resource_id INTEGER NOT NULL REFERENCES resources(id),
+            body TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS course_requests (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            title VARCHAR NOT NULL,
+            description TEXT,
+            status VARCHAR DEFAULT 'pending',
+            admin_note VARCHAR,
+            created_at TIMESTAMP DEFAULT NOW()
+        )""",
+        """CREATE TABLE IF NOT EXISTS quiz_cache (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            cache_key VARCHAR NOT NULL,
+            json_data TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW(),
+            UNIQUE (user_id, cache_key)
+        )""",
+        "ALTER TABLE quiz_cache ADD COLUMN resource_hash VARCHAR",
+    ]
+    for sql in migrations:
+        try:
+            with engine.begin() as conn:   # each migration in its own transaction
                 conn.execute(sa.text(sql))
-                conn.commit()
-            except Exception:
-                pass  # already exists
+        except Exception:
+            pass  # already exists or not applicable
 
 
 @app.get("/")
