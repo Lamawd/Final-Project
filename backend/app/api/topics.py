@@ -437,9 +437,16 @@ async def get_course_quiz(course_id: int, db: Session = Depends(get_db),
 
         data = await _call_ai(prompt, api_key, timeout=30.0)
         if data and "questions" in data and len(data["questions"]) >= 5:
-            result = {"questions": data["questions"], "has_coding": is_coding_course}
-            _save_db_cache(current_user.id, cache_key, result, db)
-            return result
+            # For coding courses, only cache if the AI actually returned coding questions
+            # — don't cache a MCQ-only response that slipped through on a failed attempt
+            has_coding_questions = any(q.get("type") == "code" for q in data["questions"])
+            if is_coding_course and not has_coding_questions:
+                # AI returned MCQ only for a coding course — don't cache, try again next time
+                pass
+            else:
+                result = {"questions": data["questions"], "has_coding": is_coding_course}
+                _save_db_cache(current_user.id, cache_key, result, db)
+                return result
 
     # Hardcoded fallback per course
     FALLBACK_QUESTIONS = {
@@ -507,7 +514,16 @@ async def get_course_quiz(course_id: int, db: Session = Depends(get_db),
 
     fallback = FALLBACK_QUESTIONS.get(course_id, [])
     if fallback:
-        return {"questions": fallback, "has_coding": False}
+        # If this is a coding course, add basic coding questions to the fallback
+        if is_coding_course:
+            coding_fallbacks = [
+                {"type":"code","q":"Write a function that returns the sum of two numbers.","starter":"def solution(a, b):\n    pass","test_cases":[{"input":[2,3],"expected":5},{"input":[0,0],"expected":0},{"input":[-1,1],"expected":0}],"language":"python"},
+                {"type":"code","q":"Write a function that returns True if a string is a palindrome (ignoring case), False otherwise.","starter":"def solution(s):\n    pass","test_cases":[{"input":["racecar"],"expected":True},{"input":["hello"],"expected":False},{"input":["A"],"expected":True}],"language":"python"},
+                {"type":"code","q":"Write a function that returns the maximum value in a list of integers.","starter":"def solution(nums):\n    pass","test_cases":[{"input":[[1,5,3]],"expected":5},{"input":[[-10,-5,-1]],"expected":-1},{"input":[[42]],"expected":42}],"language":"python"},
+                {"type":"code","q":"Write a function that reverses a string.","starter":"def solution(s):\n    pass","test_cases":[{"input":["hello"],"expected":"olleh"},{"input":[""],"expected":""},{"input":["a"],"expected":"a"}],"language":"python"},
+            ]
+            fallback = fallback[:6] + coding_fallbacks  # 6 MCQ + 4 coding
+        return {"questions": fallback[:10], "has_coding": is_coding_course}
 
     generic = []
     for t in topics[:10]:
